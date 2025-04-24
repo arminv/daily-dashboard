@@ -31,9 +31,11 @@ impl Component for Home {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
+                // println!("tick");
                 // add any logic here that should run on every tick
             }
             Action::Render => {
+                // println!("render");
                 // add any logic here that should run on every render
             }
             _ => {}
@@ -43,7 +45,7 @@ impl Component for Home {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // Text content
-        let text = "hello world";
+        let text = "WELCOME TO DAILY DASHBOARD";
 
         // Calculate a centered area for the text
         let center_rect = Rect {
