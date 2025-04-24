@@ -42,7 +42,25 @@ impl Component for Home {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        frame.render_widget(Paragraph::new("hello world"), area);
+        // Text content
+        let text = "hello world";
+
+        // Calculate a centered area for the text
+        let center_rect = Rect {
+            // Center horizontally
+            x: area.x + (area.width.saturating_sub(text.len() as u16)) / 2,
+            // Center vertically
+            y: area.y + area.height / 2,
+            // Exact width needed for the text
+            width: text.len() as u16,
+            height: 1,
+        };
+
+        // Create the paragraph with the centered text
+        let paragraph = Paragraph::new(text);
+
+        // Render the widget
+        frame.render_widget(paragraph, center_rect);
         Ok(())
     }
 }

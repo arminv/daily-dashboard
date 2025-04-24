@@ -8,7 +8,7 @@ use derive_deref::{Deref, DerefMut};
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
 use ratatui::style::{Color, Modifier, Style};
-use serde::{Deserialize, de::Deserializer};
+use serde::{de::Deserializer, Deserialize};
 use tracing::error;
 
 use crate::{action::Action, app::Mode};
