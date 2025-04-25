@@ -152,7 +152,7 @@ impl Greeting {
 impl Component for Greeting {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // Prepare greeting text
-        let greeting_message = String::from("👋 Hello, ") + &whoami::realname() + " 😊";
+        let greeting_message = String::from("👋 ") + &whoami::realname() + " 😊";
         let now = Local::now();
         let datetime_str = now.format("%A, %B %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
@@ -179,10 +179,10 @@ impl Component for Greeting {
         };
 
         let greeting_widget =
-            Paragraph::new(greeting_message).style(Style::default().add_modifier(Modifier::BOLD));
+            Paragraph::new(greeting_message).style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan));
         let date_widget =
             Paragraph::new(datetime_str).style(Style::default().add_modifier(Modifier::BOLD));
-        let location_widget = Paragraph::new(location_str).style(Style::default());
+        let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Magenta));
 
         frame.render_widget(greeting_widget, greeting_area);
         frame.render_widget(date_widget, date_area);

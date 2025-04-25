@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude::Modifier, prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
@@ -59,7 +59,9 @@ impl Component for Home {
         };
 
         // Create the paragraph with the centered text
-        let paragraph = Paragraph::new(text);
+        let paragraph = Paragraph::new(text)
+            .add_modifier(Modifier::BOLD)
+            .style(Style::default().fg(Color::LightYellow));
 
         // Render the widget
         frame.render_widget(paragraph, center_rect);
