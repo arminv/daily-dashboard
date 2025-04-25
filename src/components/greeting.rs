@@ -1,3 +1,5 @@
+use super::Component;
+use crate::app::LoadingStatus;
 use chrono::Local;
 use color_eyre::Result;
 use ratatui::{
@@ -7,8 +9,6 @@ use ratatui::{
     widgets::Paragraph,
 };
 use std::sync::{Arc, RwLock};
-use crate::app::LoadingStatus;
-use super::Component;
 
 #[derive(Debug, Clone, Default)]
 pub struct LocationState {
@@ -45,7 +45,7 @@ impl Greeting {
         greeting
     }
 
-    pub(crate) fn run(&self) {
+    fn run(&self) {
         let this = self.clone(); // clone the widget to pass to the background task
         tokio::spawn(async move {
             this.fetch_location_data().await;
@@ -136,7 +136,7 @@ impl Greeting {
             LoadingStatus::Loading => "Location: Loading...".to_string(),
             LoadingStatus::Loaded => {
                 format!(
-                    "Location: {}, {}, {}, {}, {}",
+                    "🌐 Location: {}, {} - {} - {}, {}",
                     state.location.city,
                     state.location.country,
                     state.location.timezone,
@@ -152,18 +152,18 @@ impl Greeting {
 impl Component for Greeting {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // Prepare greeting text
-        let greeting_message = String::from("Hello, ") + &whoami::realname() + "!";
+        let greeting_message = String::from("👋 Hello, ") + &whoami::realname() + " 😊";
         let now = Local::now();
         let datetime_str = now.format("%A, %B %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
+        // TODO: make layout truly responsive:
         let greeting_area = Rect {
             x: area.x,
             y: area.y,
             width: area.width.min(30),
             height: 1,
         };
-
         let date_area = Rect {
             // Position on the right side of the screen
             x: area.x + area.width - datetime_str.len() as u16,
@@ -171,7 +171,6 @@ impl Component for Greeting {
             width: datetime_str.len() as u16,
             height: 1,
         };
-
         let location_area = Rect {
             x: area.x,
             y: area.y + 1, // Position below the greeting
@@ -181,10 +180,8 @@ impl Component for Greeting {
 
         let greeting_widget =
             Paragraph::new(greeting_message).style(Style::default().add_modifier(Modifier::BOLD));
-
         let date_widget =
             Paragraph::new(datetime_str).style(Style::default().add_modifier(Modifier::BOLD));
-
         let location_widget = Paragraph::new(location_str).style(Style::default());
 
         frame.render_widget(greeting_widget, greeting_area);

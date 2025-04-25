@@ -45,7 +45,7 @@ impl Component for Home {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // Text content
-        let text = "WELCOME TO DAILY DASHBOARD";
+        let text = "WELCOME TO YOUR DAILY DASHBOARD 🌄";
 
         // Calculate a centered area for the text
         let center_rect = Rect {
