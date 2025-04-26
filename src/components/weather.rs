@@ -195,12 +195,12 @@ impl Weather {
         let state = self.state.read().unwrap();
 
         match state.loading_status {
-            LoadingStatus::NotStarted => "Weather: Not loaded yet".to_string(),
+            LoadingStatus::NotStarted => "...".to_string(),
             LoadingStatus::Loading => "Weather: Loading...".to_string(),
             LoadingStatus::Loaded => {
                 format!(
-                    "{} Weather for {}: {:.1}°C {} ({})",
-                    state.icon, state.city, state.temperature, state.description, state.wind
+                    "{}{}{} for {}: {:.1}°C {} ({})",
+                    state.icon, state.icon,state.icon,state.city, state.temperature, state.description, state.wind
                 )
             }
             LoadingStatus::Error(ref error) => format!("Weather error: {}", error),

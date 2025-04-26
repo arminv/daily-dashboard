@@ -136,11 +136,9 @@ impl Greeting {
             LoadingStatus::Loading => "Location: Loading...".to_string(),
             LoadingStatus::Loaded => {
                 format!(
-                    "🌐 Location: {}, {} - {}, {}",
+                    "🌐 Location: {}, {}",
                     state.location.city,
                     state.location.country,
-                    state.location.latitude,
-                    state.location.longitude,
                 )
             }
             LoadingStatus::Error(ref error) => format!("Location error: {}", error),
