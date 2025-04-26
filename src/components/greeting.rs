@@ -95,8 +95,7 @@ impl Greeting {
             Err(error) => {
                 tracing::error!("Error fetching public IP: {}", error);
                 self.set_loading_state(LoadingStatus::Error(format!(
-                    "Failed to get public IP: {}",
-                    error
+                    "Failed to get public IP: {error:?}",
                 )));
             }
         }
@@ -138,7 +137,7 @@ impl Greeting {
                     state.location.city, state.location.country,
                 )
             }
-            LoadingStatus::Error(ref error) => format!("Location error: {}", error),
+            LoadingStatus::Error(ref error) => format!("Location error: {error:?}"),
         }
     }
 }

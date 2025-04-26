@@ -96,14 +96,13 @@ impl Weather {
 
         let (city, lat, lon) = location_data;
         let api_url = format!(
-            "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weather_code,wind_speed_10m",
-            lat, lon
+            "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m",
         );
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
             Err(e) => {
-                let error_msg = format!("API request failed: {}", e);
-                error!("Weather: {}", error_msg);
+                let error_msg = format!("API request failed: {e:?}");
+                error!("Weather: {error_msg:?}");
                 self.set_loading_state(LoadingStatus::Error(error_msg));
                 return;
             }
@@ -120,8 +119,8 @@ impl Weather {
         let body_text = match response.text().await {
             Ok(text) => text,
             Err(e) => {
-                let error_msg = format!("Failed to read response body: {}", e);
-                error!("Weather: {}", error_msg);
+                let error_msg = format!("Failed to read response body: {e:?}",);
+                error!("Weather: {error_msg:?}");
                 self.set_loading_state(LoadingStatus::Error(error_msg));
                 return;
             }
@@ -131,8 +130,8 @@ impl Weather {
         let json: serde_json::Value = match serde_json::from_str(&body_text) {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("Failed to parse JSON: {}", e);
-                error!("Weather: {}", error_msg);
+                let error_msg = format!("Failed to parse JSON: {e:?}");
+                error!("Weather: {error_msg:?}");
                 self.set_loading_state(LoadingStatus::Error(error_msg));
                 return;
             }
@@ -163,8 +162,8 @@ impl Weather {
         // Get wind speed
         if let Some(wind) = current.get("wind_speed_10m") {
             if let Some(value) = wind.as_f64() {
-                weather_state.wind = format!("{:.1} km/h", value);
-                info!("Weather: Wind: {}", value);
+                weather_state.wind = format!("{value:.1} km/h");
+                info!("Weather: Wind: {value:?}");
             }
         }
 
@@ -206,7 +205,7 @@ impl Weather {
                 if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                     "Weather: Waiting for location data...".to_string()
                 } else {
-                    format!("Weather error: {}", error)
+                    format!("Weather error: {error:?}")
                 }
             }
         }
