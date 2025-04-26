@@ -74,7 +74,6 @@ impl Greeting {
                             ip_info.country
                         );
 
-                        // Create a new LocationState instance
                         let location_data = LocationState {
                             city: ip_info.city,
                             country: ip_info.country,
@@ -132,10 +131,7 @@ impl Greeting {
             LoadingStatus::NotStarted => "Location: Not loaded yet".to_string(),
             LoadingStatus::Loading => "Location: Loading...".to_string(),
             LoadingStatus::Loaded => {
-                format!(
-                    "🌐 Location: {}, {}",
-                    state.location.city, state.location.country,
-                )
+                format!("🌐 {}, {}", state.location.city, state.location.country,)
             }
             LoadingStatus::Error(ref error) => format!("Location error: {error:?}"),
         }
@@ -144,8 +140,7 @@ impl Greeting {
 
 impl Component for Greeting {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        // Prepare greeting text
-        let greeting_message = String::from("👋 ") + &whoami::realname() + " 😊";
+        let greeting_message = String::from("👋 ") + &whoami::username().to_ascii_uppercase();
         let now = Local::now();
         let datetime_str = now.format("%A, %B %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
@@ -176,8 +171,8 @@ impl Component for Greeting {
                 .add_modifier(Modifier::BOLD)
                 .fg(Color::Cyan),
         );
-        let date_widget =
-            Paragraph::new(datetime_str).style(Style::default().add_modifier(Modifier::BOLD));
+        let date_widget = Paragraph::new(datetime_str)
+            .style(Style::default().bg(Color::LightYellow).fg(Color::Black));
         let location_widget =
             Paragraph::new(location_str).style(Style::default().fg(Color::Magenta));
 

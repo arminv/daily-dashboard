@@ -36,7 +36,6 @@ impl Weather {
         state.loading_status = status;
     }
 
-    // TODO: verify again
     // Helper method to convert weather code to description
     fn get_weather_description(&self, code: u32) -> String {
         match code {
@@ -54,7 +53,6 @@ impl Weather {
         }
     }
 
-    // TODO: verify again
     // Helper method to get weather icon
     fn get_weather_icon(&self, code: u32) -> String {
         match code {
@@ -191,11 +189,10 @@ impl Weather {
             LoadingStatus::Loading => "Weather: Loading...".to_string(),
             LoadingStatus::Loaded => {
                 format!(
-                    "{}{}{} for {}: {:.1}°C {} ({})",
+                    "{}{}{} {:.1}°C {} ({})",
                     state.icon,
                     state.icon,
                     state.icon,
-                    state.city,
                     state.temperature,
                     state.description,
                     state.wind
