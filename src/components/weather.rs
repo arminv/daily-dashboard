@@ -213,12 +213,6 @@ impl Weather {
 }
 
 impl Component for Weather {
-    fn init(&mut self, _area: Size) -> Result<()> {
-        // Don't immediately fetch - the tick handler will do it when `location` is ready
-        info!("Weather: Component initialized, waiting for location data");
-        Ok(())
-    }
-
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
