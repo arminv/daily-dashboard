@@ -147,21 +147,20 @@ impl Component for Greeting {
 
         // TODO: make layout truly responsive:
         let greeting_area = Rect {
-            x: area.x,
-            y: area.y,
+            x: area.x + 1,
+            y: area.y + 1,
             width: area.width.min(30),
-            height: 1,
+            height: 2,
         };
         let date_area = Rect {
-            // Position on the right side of the screen
-            x: area.x + area.width - datetime_str.len() as u16,
-            y: area.y,
+            x: area.x + area.width - datetime_str.len() as u16 - 1,
+            y: area.y + 1,
             width: datetime_str.len() as u16,
             height: 1,
         };
         let location_area = Rect {
-            x: area.x,
-            y: area.y + 1, // Position below the greeting
+            x: area.x + 1,
+            y: area.y + 2, // Position below the greeting
             width: area.width,
             height: 1,
         };

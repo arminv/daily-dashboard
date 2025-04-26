@@ -240,8 +240,8 @@ impl Component for Weather {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let weather_str = self.get_weather_display();
         let weather_area = Rect {
-            x: area.x,
-            y: area.y + 2, // Position below location
+            x: area.x + 1,
+            y: area.y + 3, // Position below location
             width: area.width,
             height: 1,
         };

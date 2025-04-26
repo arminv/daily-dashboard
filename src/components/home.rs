@@ -57,13 +57,15 @@ impl Component for Home {
             width: text.len() as u16,
             height: 1,
         };
+        let vertical = Layout::vertical([Constraint::Percentage(100)]);
+        let [content] = vertical.areas(area);
 
-        // Create the paragraph with the centered text
+        let block = Block::bordered();
         let paragraph = Paragraph::new(text)
             .add_modifier(Modifier::BOLD)
             .style(Style::default().fg(Color::LightYellow));
 
-        // Render the widget
+        frame.render_widget(block, content);
         frame.render_widget(paragraph, center_rect);
         Ok(())
     }
