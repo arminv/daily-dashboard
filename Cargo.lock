@@ -545,7 +545,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "daily-dashboard-v2"
+name = "daily-dashboard"
 version = "0.1.0"
 dependencies = [
  "anyhow",

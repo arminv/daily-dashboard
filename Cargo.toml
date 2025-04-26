@@ -1,5 +1,5 @@
 [package]
-name = "daily-dashboard-v2"
+name = "daily-dashboard"
 version = "0.1.0"
 edition = "2024"
 description = "A TUI app for showing important info as a daily dashboard"
