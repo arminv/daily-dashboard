@@ -27,7 +27,7 @@ pub struct GreetingState {
 
 #[derive(Clone)]
 pub struct Greeting {
-    state: Arc<RwLock<GreetingState>>,
+    pub state: Arc<RwLock<GreetingState>>,
 }
 
 impl Default for Greeting {
@@ -136,10 +136,9 @@ impl Greeting {
             LoadingStatus::Loading => "Location: Loading...".to_string(),
             LoadingStatus::Loaded => {
                 format!(
-                    "🌐 Location: {}, {} - {} - {}, {}",
+                    "🌐 Location: {}, {} - {}, {}",
                     state.location.city,
                     state.location.country,
-                    state.location.timezone,
                     state.location.latitude,
                     state.location.longitude,
                 )

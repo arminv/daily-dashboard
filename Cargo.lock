@@ -567,6 +567,7 @@ dependencies = [
  "ratatui",
  "reqwest",
  "serde",
+ "serde_json",
  "signal-hook",
  "strip-ansi-escapes",
  "strum",

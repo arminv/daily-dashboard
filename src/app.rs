@@ -11,6 +11,7 @@ use crate::{
     config::Config,
     tui::{Event, Tui},
 };
+use crate::components::weather::Weather;
 
 pub struct App {
     config: Config,
@@ -31,7 +32,7 @@ pub enum Mode {
     Home,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum LoadingStatus {
     #[default]
     NotStarted,
@@ -43,12 +44,21 @@ pub enum LoadingStatus {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
+        
+        // Create a greeting component first
+        let greeting = Greeting::new();
+        let greeting_state = greeting.state.clone();
+        
+        // Create a weather component with access to greeting's state
+        let weather = Weather::new(greeting_state);
+        
         Ok(Self {
             tick_rate,
             frame_rate,
             components: vec![
                 Box::new(Home::new()),
-                Box::new(Greeting::new()),
+                Box::new(greeting),
+                Box::new(weather),
                 // Box::new(FpsCounter::default()),
             ],
             should_quit: false,
