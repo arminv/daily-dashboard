@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
+use crate::components::weather::Weather;
 use crate::{
     action::Action,
     components::{Component, greeting::Greeting, home::Home},
     config::Config,
     tui::{Event, Tui},
 };
-use crate::components::weather::Weather;
 
 pub struct App {
     config: Config,
@@ -44,14 +44,14 @@ pub enum LoadingStatus {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        
+
         // Create a greeting component first
         let greeting = Greeting::new();
         let greeting_state = greeting.state.clone();
-        
+
         // Create a weather component with access to greeting's state
         let weather = Weather::new(greeting_state);
-        
+
         Ok(Self {
             tick_rate,
             frame_rate,

@@ -14,7 +14,6 @@ use std::sync::{Arc, RwLock};
 pub struct LocationState {
     pub city: String,
     pub country: String,
-    pub timezone: String,
     pub latitude: f64,
     pub longitude: f64,
 }
@@ -79,7 +78,6 @@ impl Greeting {
                         let location_data = LocationState {
                             city: ip_info.city,
                             country: ip_info.country,
-                            timezone: ip_info.timezone,
                             latitude: ip_info.latitude.parse().unwrap_or(0.0),
                             longitude: ip_info.longitude.parse().unwrap_or(0.0),
                         };
@@ -137,8 +135,7 @@ impl Greeting {
             LoadingStatus::Loaded => {
                 format!(
                     "🌐 Location: {}, {}",
-                    state.location.city,
-                    state.location.country,
+                    state.location.city, state.location.country,
                 )
             }
             LoadingStatus::Error(ref error) => format!("Location error: {}", error),

@@ -1,6 +1,6 @@
 use super::Component;
+use crate::action::Action;
 use crate::app::LoadingStatus;
-use crate::{action::Action};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
@@ -25,11 +25,10 @@ pub struct Weather {
 
 impl Weather {
     pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {
-        let weather = Self {
+        Self {
             state: Arc::new(RwLock::new(WeatherState::default())),
             greeting_state,
-        };
-        weather
+        }
     }
 
     fn set_loading_state(&self, status: LoadingStatus) {
@@ -37,6 +36,7 @@ impl Weather {
         state.loading_status = status;
     }
 
+    // TODO: verify again
     // Helper method to convert weather code to description
     fn get_weather_description(&self, code: u32) -> String {
         match code {
@@ -44,28 +44,29 @@ impl Weather {
             1 => "Mainly clear".to_string(),
             2 => "Partly cloudy".to_string(),
             3 => "Overcast".to_string(),
-            45 | 48 => "Fog".to_string(),
-            51 | 53 | 55 => "Drizzle".to_string(),
-            61 | 63 | 65 => "Rain".to_string(),
-            71 | 73 | 75 => "Snow".to_string(),
-            80 | 81 | 82 => "Rain showers".to_string(),
-            95 | 96 | 99 => "Thunderstorm".to_string(),
+            45..=48 => "Fog".to_string(),
+            51..=55 => "Drizzle".to_string(),
+            61..=65 => "Rain".to_string(),
+            71..=75 => "Snow".to_string(),
+            80..=82 => "Rain showers".to_string(),
+            95..=99 => "Thunderstorm".to_string(),
             _ => "Unknown".to_string(),
         }
     }
 
+    // TODO: verify again
     // Helper method to get weather icon
     fn get_weather_icon(&self, code: u32) -> String {
         match code {
             0 => "☀️".to_string(),
             1 | 2 => "🌤️".to_string(),
             3 => "☁️".to_string(),
-            45 | 48 => "🌫️".to_string(),
-            51 | 53 | 55 => "🌧️".to_string(),
-            61 | 63 | 65 => "🌧️".to_string(),
-            71 | 73 | 75 => "❄️".to_string(),
-            80 | 81 | 82 => "🌦️".to_string(),
-            95 | 96 | 99 => "⛈️".to_string(),
+            45..=48 => "🌫️".to_string(),
+            51..=55 => "🌧️".to_string(),
+            61..=65 => "🌧️".to_string(),
+            71..=75 => "❄️".to_string(),
+            80..=82 => "🌦️".to_string(),
+            95..=99 => "⛈️".to_string(),
             _ => "🌡️".to_string(),
         }
     }
@@ -78,9 +79,10 @@ impl Weather {
             let greeting_state = self.greeting_state.read().unwrap();
             if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                 info!(
-                    "Weather: Location not loaded (status: {:?})",
+                    "Weather: Location not loaded yet (status: {:?}), will retry later",
                     greeting_state.loading_status
                 );
+                self.set_loading_state(LoadingStatus::NotStarted);
                 return;
             }
 
@@ -93,19 +95,10 @@ impl Weather {
         };
 
         let (city, lat, lon) = location_data;
-        if city.is_empty() {
-            info!("Weather: City name is empty, can't fetch weather");
-            self.set_loading_state(LoadingStatus::Error("City name is empty".to_string()));
-            return;
-        }
-
-        // Build the API URL
         let api_url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,weather_code,wind_speed_10m",
             lat, lon
         );
-
-        // Make the API request
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
             Err(e) => {
@@ -156,7 +149,6 @@ impl Weather {
             }
         };
 
-        // Update the weather state
         let mut weather_state = self.state.write().unwrap();
         weather_state.city = city;
 
@@ -193,6 +185,7 @@ impl Weather {
 
     fn get_weather_display(&self) -> String {
         let state = self.state.read().unwrap();
+        let greeting_state = self.greeting_state.read().unwrap();
 
         match state.loading_status {
             LoadingStatus::NotStarted => "...".to_string(),
@@ -200,54 +193,56 @@ impl Weather {
             LoadingStatus::Loaded => {
                 format!(
                     "{}{}{} for {}: {:.1}°C {} ({})",
-                    state.icon, state.icon,state.icon,state.city, state.temperature, state.description, state.wind
+                    state.icon,
+                    state.icon,
+                    state.icon,
+                    state.city,
+                    state.temperature,
+                    state.description,
+                    state.wind
                 )
             }
-            LoadingStatus::Error(ref error) => format!("Weather error: {}", error),
+            LoadingStatus::Error(ref error) => {
+                if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
+                    "Weather: Waiting for location data...".to_string()
+                } else {
+                    format!("Weather error: {}", error)
+                }
+            }
         }
     }
 }
 
 impl Component for Weather {
     fn init(&mut self, _area: Size) -> Result<()> {
-        let this = self.clone();
-        tokio::spawn(async move {
-            // TODO:
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-            info!("Weather: Initial fetch after startup delay");
-            this.fetch_weather_data().await;
-        });
-
+        // Don't immediately fetch - the tick handler will do it when `location` is ready
+        info!("Weather: Component initialized, waiting for location data");
         Ok(())
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {
-                // Should we try fetching weather?
-                let should_fetch = {
-                    let weather_state = self.state.read().unwrap();
-                    let greeting_state = self.greeting_state.read().unwrap();
+        if action == Action::Tick {
+            let should_fetch = {
+                let weather_state = self.state.read().unwrap();
+                let greeting_state = self.greeting_state.read().unwrap();
 
-                    // Only fetch if:
-                    // 1. Location is loaded
-                    // 2. Weather is not loaded, or had an error
-                    matches!(greeting_state.loading_status, LoadingStatus::Loaded)
-                        && matches!(
-                            weather_state.loading_status,
-                            LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                        )
-                };
+                // Only fetch if:
+                // 1. Location is loaded
+                // 2. Weather is not loaded, or had an error, or is still loading for too long
+                matches!(greeting_state.loading_status, LoadingStatus::Loaded)
+                    && matches!(
+                        weather_state.loading_status,
+                        LoadingStatus::NotStarted | LoadingStatus::Error(_)
+                    )
+            };
 
-                if should_fetch {
-                    let this = self.clone();
-                    tokio::spawn(async move {
-                        info!("Weather: Trying fetch from tick event");
-                        this.fetch_weather_data().await;
-                    });
-                }
+            if should_fetch {
+                let this = self.clone();
+                tokio::spawn(async move {
+                    info!("Weather: Trying fetch from tick event - location data is ready");
+                    this.fetch_weather_data().await;
+                });
             }
-            _ => {}
         }
         Ok(None)
     }
@@ -260,8 +255,7 @@ impl Component for Weather {
             width: area.width,
             height: 1,
         };
-        let weather_widget =
-            Paragraph::new(weather_str).style(Style::default().fg(Color::Green));
+        let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Green));
 
         frame.render_widget(weather_widget, weather_area);
         Ok(())
