@@ -7,7 +7,7 @@ use tracing::{debug, info};
 
 use crate::{
     action::Action,
-    components::{greeting::Greeting, home::Home, Component},
+    components::{Component, greeting::Greeting, home::Home},
     config::Config,
     tui::{Event, Tui},
 };

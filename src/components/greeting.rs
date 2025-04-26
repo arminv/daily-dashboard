@@ -178,11 +178,15 @@ impl Component for Greeting {
             height: 1,
         };
 
-        let greeting_widget =
-            Paragraph::new(greeting_message).style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan));
+        let greeting_widget = Paragraph::new(greeting_message).style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Cyan),
+        );
         let date_widget =
             Paragraph::new(datetime_str).style(Style::default().add_modifier(Modifier::BOLD));
-        let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Magenta));
+        let location_widget =
+            Paragraph::new(location_str).style(Style::default().fg(Color::Magenta));
 
         frame.render_widget(greeting_widget, greeting_area);
         frame.render_widget(date_widget, date_area);
