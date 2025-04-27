@@ -2,9 +2,10 @@ use super::Component;
 use crate::app::LoadingStatus;
 use chrono::Local;
 use color_eyre::Result;
+use ratatui::style::Color;
 use ratatui::{
+    Frame,
     layout::Rect,
-    prelude::*,
     style::{Modifier, Style},
     widgets::Paragraph,
 };
