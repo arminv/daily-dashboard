@@ -368,7 +368,7 @@ fn vertical_barchart(
         .collect();
 
     BarChart::default()
-        .block(Block::bordered().title("📈 7-Day Forecast".bold().into_centered_line()))
+        .block(Block::bordered().title("📈 7-Day Forecast (Low/High°)".bold().into_centered_line()))
         .value_style(Style::new().on_black().bold())
         .bar_gap(1)
         .data(BarGroup::default().bars(&bars))
@@ -404,6 +404,7 @@ fn vertical_bar(
         .value(*high_temp as u64)
         .label(label)
         .text_value(text_value)
+        .value_style(Style::new().fg(Color::LightYellow))
         .style(temperature_style(*high_temp))
 }
 
