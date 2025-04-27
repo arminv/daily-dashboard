@@ -183,53 +183,50 @@ impl Weather {
             let temp_min_array = daily.get("temperature_2m_min");
             let time_array = daily.get("time");
 
-            if let (Some(time_array), Some(max_temp_array)) = (time_array, temp_max_array) {
-                if let Some(time_values) = time_array.as_array() {
-                    for time_value in time_values {
-                        if let Some(date_str) = time_value.as_str() {
-                            // Extract only month and day (MM-DD) from the date string (format: YYYY-MM-DD)
-                            if date_str.len() >= 10 {
-                                let month_day = &date_str[5..10]; // Get MM-DD part
-                                weather_state.daily_dates.push(month_day.to_string());
-                                // Parse the date to get the weekday name
-                                if let Ok(parsed_date) =
-                                    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                                {
-                                    weather_state
-                                        .daily_weekdays
-                                        .push(parsed_date.weekday().to_string());
-                                } else {
-                                    weather_state.daily_weekdays.push("???".to_string());
-                                }
-                            } else {
-                                weather_state.daily_dates.push(date_str.to_string());
-                                weather_state.daily_weekdays.push("???".to_string());
-                            }
-                        }
-                    }
-                }
+            // Process dates and weekdays
+            if let (Some(_), Some(time_values)) =
+                (time_array, time_array.and_then(|a| a.as_array()))
+            {
+                for time_value in time_values {
+                    let date_str = time_value.as_str().unwrap_or("???");
 
-                // Process max temperatures
-                if let Some(temp_values) = max_temp_array.as_array() {
-                    for temp_value in temp_values {
-                        if let Some(value) = temp_value.as_f64() {
-                            weather_state.daily_high_temperatures.push(value as f32);
-                            info!("Weather: Daily max temp: {}", value);
-                        }
-                    }
-                }
+                    if date_str.len() >= 10 {
+                        let month_day = &date_str[5..10];
+                        weather_state.daily_dates.push(month_day.to_string());
 
-                // Process min temperatures
-                if let Some(min_temp_array) = temp_min_array {
-                    if let Some(temp_values) = min_temp_array.as_array() {
-                        for temp_value in temp_values {
-                            if let Some(value) = temp_value.as_f64() {
-                                weather_state.daily_low_temperatures.push(value as f32);
-                                info!("Weather: Daily min temp: {}", value);
-                            }
-                        }
+                        // Get the weekday name
+                        weather_state.daily_weekdays.push(
+                            NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                                .map(|date| date.weekday().to_string())
+                                .unwrap_or_else(|_| "???".to_string()),
+                        );
+                    } else {
+                        weather_state.daily_dates.push(date_str.to_string());
+                        weather_state.daily_weekdays.push("???".to_string());
                     }
                 }
+            }
+
+            if let Some(max_temps) = temp_max_array.and_then(|a| a.as_array()) {
+                weather_state
+                    .daily_high_temperatures
+                    .extend(max_temps.iter().filter_map(|v| {
+                        v.as_f64().map(|temp| {
+                            info!("Weather: Daily max temp: {}", temp);
+                            temp as f32
+                        })
+                    }));
+            }
+
+            if let Some(min_temps) = temp_min_array.and_then(|a| a.as_array()) {
+                weather_state
+                    .daily_low_temperatures
+                    .extend(min_temps.iter().filter_map(|v| {
+                        v.as_f64().map(|temp| {
+                            info!("Weather: Daily min temp: {}", temp);
+                            temp as f32
+                        })
+                    }));
             }
         }
 
