@@ -195,16 +195,9 @@ impl Weather {
                                 if let Ok(parsed_date) =
                                     NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                                 {
-                                    let weekday = match parsed_date.weekday() {
-                                        chrono::Weekday::Mon => "Mon",
-                                        chrono::Weekday::Tue => "Tue",
-                                        chrono::Weekday::Wed => "Wed",
-                                        chrono::Weekday::Thu => "Thu",
-                                        chrono::Weekday::Fri => "Fri",
-                                        chrono::Weekday::Sat => "Sat",
-                                        chrono::Weekday::Sun => "Sun",
-                                    };
-                                    weather_state.daily_weekdays.push(weekday.to_string());
+                                    weather_state
+                                        .daily_weekdays
+                                        .push(parsed_date.weekday().to_string());
                                 } else {
                                     weather_state.daily_weekdays.push("???".to_string());
                                 }
@@ -317,19 +310,14 @@ impl Component for Weather {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(4), // Space for upper content
-                Constraint::Length(1), // Chart title
+                Constraint::Length(0), // Chart title
                 Constraint::Length(8), // Chart main area
             ])
             .split(area);
-        let title_area = layout[1];
         let main_area = layout[2];
-        let padded_title_area = Rect {
-            x: title_area.x + 1, // Add left padding
-            width: title_area.width.saturating_sub(2),
-            ..title_area
-        };
         let padded_chart_area = Rect {
             x: main_area.x + 1, // Add left padding
+            y: main_area.y,
             width: main_area.width.saturating_sub(2),
             ..main_area
         };
@@ -350,7 +338,6 @@ impl Component for Weather {
                 )
             };
 
-            frame.render_widget("📈 7-Day Forecast".bold(), padded_title_area);
             frame.render_widget(
                 vertical_barchart(&high_temps, &low_temps, &dates, &weekdays),
                 padded_chart_area,
@@ -381,6 +368,9 @@ fn vertical_barchart(
         .collect();
 
     BarChart::default()
+        .block(Block::bordered().title("📈 7-Day Forecast".bold().into_centered_line()))
+        .value_style(Style::new().on_black().bold())
+        .bar_gap(1)
         .data(BarGroup::default().bars(&bars))
         .bar_width(10)
 }
