@@ -295,8 +295,8 @@ impl Component for Weather {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let weather_str = self.get_weather_display();
         let weather_area = Rect {
-            x: area.x + 1,
-            y: area.y + 3, // Position below location
+            x: area.x + 2,
+            y: area.y + 4, // Position below location
             width: area.width - 2,
             height: 1,
         };
@@ -314,7 +314,7 @@ impl Component for Weather {
         let main_area = layout[2];
         let padded_chart_area = Rect {
             x: main_area.x + 1, // Add left padding
-            y: main_area.y,
+            y: main_area.y + 2,
             width: main_area.width.saturating_sub(2),
             ..main_area
         };
@@ -362,6 +362,7 @@ fn vertical_barchart(
     BarChart::default()
         .block(Block::bordered().title("📈 7-Day Forecast (Low/High°)".bold().into_centered_line()))
         .value_style(Style::new().on_black().bold())
+        .label_style(Style::new().fg(Color::Red))
         .bar_gap(1)
         .data(BarGroup::default().bars(&bars))
         .bar_width(10)

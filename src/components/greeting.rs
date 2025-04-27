@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Modifier, Style},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Paragraph},
 };
 use std::sync::{Arc, RwLock};
 
@@ -147,38 +147,50 @@ impl Component for Greeting {
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
-        // TODO: make layout truly responsive:
+        // Define area for the bordered content
+        let border_area = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height - 1,
+        };
+
+        // Create border widget with date as title
+        let border_widget = Block::default()
+            .title(datetime_str)
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::LightCyan));
+
+        // Define areas for content inside the border
         let greeting_area = Rect {
-            x: area.x + 1,
-            y: area.y + 1,
+            x: area.x + 2, // Adjusted for border
+            y: area.y + 2, // Adjusted for border and title
             width: area.width.min(30),
             height: 2,
         };
-        let date_area = Rect {
-            x: area.x + area.width - datetime_str.len() as u16 - 1,
-            y: area.y + 1,
-            width: datetime_str.len() as u16,
-            height: 1,
-        };
+
         let location_area = Rect {
-            x: area.x + 1,
-            y: area.y + 2, // Position below the greeting
-            width: area.width - 2,
+            x: area.x + 2,         // Adjusted for border
+            y: area.y + 3,         // Position below the greeting
+            width: area.width - 4, // Account for the border on both sides
             height: 1,
         };
 
+        // Create content widgets
         let greeting_widget = Paragraph::new(greeting_message).style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
-                .fg(Color::Cyan),
+                .fg(Color::White),
         );
-        let date_widget = Paragraph::new(datetime_str)
-            .style(Style::default().bg(Color::LightYellow).fg(Color::Black));
-        let location_widget =
-            Paragraph::new(location_str).style(Style::default().fg(Color::Magenta));
 
+        let location_widget =
+            Paragraph::new(location_str).style(Style::default().fg(Color::DarkGray));
+
+        // Render border first so other widgets appear on top of it
+        frame.render_widget(border_widget, border_area);
+
+        // Render content on top of the border
         frame.render_widget(greeting_widget, greeting_area);
-        frame.render_widget(date_widget, date_area);
         frame.render_widget(location_widget, location_area);
 
         Ok(())
