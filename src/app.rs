@@ -8,7 +8,7 @@ use tracing::{debug, info};
 use crate::components::weather::Weather;
 use crate::{
     action::Action,
-    components::{Component, greeting::Greeting, home::Home},
+    components::{Component, greeting::Greeting},
     config::Config,
     tui::{Event, Tui},
 };
@@ -56,7 +56,7 @@ impl App {
             tick_rate,
             frame_rate,
             components: vec![
-                Box::new(Home::new()),
+                // Box::new(Home::new()),
                 Box::new(greeting),
                 Box::new(weather),
                 // Box::new(FpsCounter::default()),

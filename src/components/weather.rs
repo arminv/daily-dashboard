@@ -1,6 +1,7 @@
 use super::Component;
 use crate::action::Action;
 use crate::app::LoadingStatus;
+use chrono::{Datelike, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
@@ -15,6 +16,10 @@ pub struct WeatherState {
     pub icon: String,
     pub wind: String,
     pub loading_status: LoadingStatus,
+    pub daily_high_temperatures: Vec<f32>,
+    pub daily_low_temperatures: Vec<f32>,
+    pub daily_dates: Vec<String>,
+    pub daily_weekdays: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -94,7 +99,7 @@ impl Weather {
 
         let (city, lat, lon) = location_data;
         let api_url = format!(
-            "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m",
+            "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7",
         );
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
@@ -149,7 +154,6 @@ impl Weather {
         let mut weather_state = self.state.write().unwrap();
         weather_state.city = city;
 
-        // Get temperature
         if let Some(temp) = current.get("temperature_2m") {
             if let Some(value) = temp.as_f64() {
                 weather_state.temperature = value as f32;
@@ -157,7 +161,6 @@ impl Weather {
             }
         }
 
-        // Get wind speed
         if let Some(wind) = current.get("wind_speed_10m") {
             if let Some(value) = wind.as_f64() {
                 weather_state.wind = format!("{value:.1} km/h");
@@ -165,7 +168,6 @@ impl Weather {
             }
         }
 
-        // Get weather code and description
         if let Some(code) = current.get("weather_code") {
             if let Some(value) = code.as_u64() {
                 let code_value = value as u32;
@@ -175,7 +177,69 @@ impl Weather {
             }
         }
 
-        // Mark as loaded
+        // Extract daily forecast data
+        if let Some(daily) = json.get("daily") {
+            let temp_max_array = daily.get("temperature_2m_max");
+            let temp_min_array = daily.get("temperature_2m_min");
+            let time_array = daily.get("time");
+
+            if let (Some(time_array), Some(max_temp_array)) = (time_array, temp_max_array) {
+                if let Some(time_values) = time_array.as_array() {
+                    for time_value in time_values {
+                        if let Some(date_str) = time_value.as_str() {
+                            // Extract only month and day (MM-DD) from the date string (format: YYYY-MM-DD)
+                            if date_str.len() >= 10 {
+                                let month_day = &date_str[5..10]; // Get MM-DD part
+                                weather_state.daily_dates.push(month_day.to_string());
+                                // Parse the date to get the weekday name
+                                if let Ok(parsed_date) =
+                                    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                                {
+                                    let weekday = match parsed_date.weekday() {
+                                        chrono::Weekday::Mon => "Mon",
+                                        chrono::Weekday::Tue => "Tue",
+                                        chrono::Weekday::Wed => "Wed",
+                                        chrono::Weekday::Thu => "Thu",
+                                        chrono::Weekday::Fri => "Fri",
+                                        chrono::Weekday::Sat => "Sat",
+                                        chrono::Weekday::Sun => "Sun",
+                                    };
+                                    weather_state.daily_weekdays.push(weekday.to_string());
+                                } else {
+                                    weather_state.daily_weekdays.push("???".to_string());
+                                }
+                            } else {
+                                weather_state.daily_dates.push(date_str.to_string());
+                                weather_state.daily_weekdays.push("???".to_string());
+                            }
+                        }
+                    }
+                }
+
+                // Process max temperatures
+                if let Some(temp_values) = max_temp_array.as_array() {
+                    for temp_value in temp_values {
+                        if let Some(value) = temp_value.as_f64() {
+                            weather_state.daily_high_temperatures.push(value as f32);
+                            info!("Weather: Daily max temp: {}", value);
+                        }
+                    }
+                }
+
+                // Process min temperatures
+                if let Some(min_temp_array) = temp_min_array {
+                    if let Some(temp_values) = min_temp_array.as_array() {
+                        for temp_value in temp_values {
+                            if let Some(value) = temp_value.as_f64() {
+                                weather_state.daily_low_temperatures.push(value as f32);
+                                info!("Weather: Daily min temp: {}", value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         weather_state.loading_status = LoadingStatus::Loaded;
         info!("Weather: Successfully loaded weather data");
     }
@@ -183,10 +247,11 @@ impl Weather {
     fn get_weather_display(&self) -> String {
         let state = self.state.read().unwrap();
         let greeting_state = self.greeting_state.read().unwrap();
+        let location_loading = "🌄 Weather is loading...".to_string();
 
         match state.loading_status {
-            LoadingStatus::NotStarted => "...".to_string(),
-            LoadingStatus::Loading => "Weather: Loading...".to_string(),
+            LoadingStatus::NotStarted => location_loading,
+            LoadingStatus::Loading => location_loading,
             LoadingStatus::Loaded => {
                 format!(
                     "{}{}{} {:.1}°C {} ({})",
@@ -242,12 +307,144 @@ impl Component for Weather {
         let weather_area = Rect {
             x: area.x + 1,
             y: area.y + 3, // Position below location
-            width: area.width,
+            width: area.width - 2,
             height: 1,
         };
         let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Green));
-
         frame.render_widget(weather_widget, weather_area);
+
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(4), // Space for upper content
+                Constraint::Length(1), // Chart title
+                Constraint::Length(8), // Chart main area
+            ])
+            .split(area);
+        let title_area = layout[1];
+        let main_area = layout[2];
+        let padded_title_area = Rect {
+            x: title_area.x + 1, // Add left padding
+            width: title_area.width.saturating_sub(2),
+            ..title_area
+        };
+        let padded_chart_area = Rect {
+            x: main_area.x + 1, // Add left padding
+            width: main_area.width.saturating_sub(2),
+            ..main_area
+        };
+
+        let has_forecast_data = {
+            let state = self.state.read().unwrap();
+            !state.daily_high_temperatures.is_empty()
+                && matches!(state.loading_status, LoadingStatus::Loaded)
+        };
+        if has_forecast_data {
+            let (high_temps, low_temps, dates, weekdays) = {
+                let state = self.state.read().unwrap();
+                (
+                    state.daily_high_temperatures.clone(),
+                    state.daily_low_temperatures.clone(),
+                    state.daily_dates.clone(),
+                    state.daily_weekdays.clone(),
+                )
+            };
+
+            frame.render_widget("📈 7-Day Forecast".bold(), padded_title_area);
+            frame.render_widget(
+                vertical_barchart(&high_temps, &low_temps, &dates, &weekdays),
+                padded_chart_area,
+            );
+        }
         Ok(())
     }
+}
+
+fn vertical_barchart(
+    high_temps: &[f32],
+    low_temps: &[f32],
+    dates: &[String],
+    weekdays: &[String],
+) -> BarChart<'static> {
+    let bars: Vec<Bar<'static>> = high_temps
+        .iter()
+        .enumerate()
+        .map(|(index, high_temp)| {
+            let low_temp = if index < low_temps.len() {
+                low_temps[index]
+            } else {
+                0.0
+            };
+
+            vertical_bar(index, high_temp, &low_temp, dates, weekdays)
+        })
+        .collect();
+
+    BarChart::default()
+        .data(BarGroup::default().bars(&bars))
+        .bar_width(10)
+}
+
+fn vertical_bar(
+    index: usize,
+    high_temp: &f32,
+    low_temp: &f32,
+    dates: &[String],
+    weekdays: &[String],
+) -> Bar<'static> {
+    // For display, round temperatures to integers
+    let high_display = high_temp.round() as i32;
+    let low_display = low_temp.round() as i32;
+
+    // Get the weekday and date for this bar
+    let date = if index < dates.len() {
+        &dates[index]
+    } else {
+        "??"
+    };
+    let weekday = if index < weekdays.len() {
+        &weekdays[index]
+    } else {
+        "?"
+    };
+    let label = Line::from(format!("{weekday} {date}")).alignment(Alignment::Center);
+    let text_value = format!("{low_display}°-{high_display}°");
+
+    Bar::default()
+        .value(*high_temp as u64)
+        .label(label)
+        .text_value(text_value)
+        .style(temperature_style(*high_temp))
+}
+
+/// Create a color gradient based on temperature
+/// - Cold temperatures (below 0°C): Blue
+/// - Moderate temperatures (0-20°C): Green to Yellow
+/// - Warm temperatures (20-30°C): Yellow to Orange
+/// - Hot temperatures (above 30°C): Orange to Red
+fn temperature_style(value: f32) -> Style {
+    let (r, g, b) = if value < 0.0 {
+        // Cold: Blue
+        (50, 50, 255)
+    } else if value < 10.0 {
+        // Cool: Blue-Green
+        let blue = (255.0 * (1.0 - value / 10.0)) as u8;
+        let green = (200.0 * (value / 10.0)) as u8;
+        (0, green, blue)
+    } else if value < 20.0 {
+        // Mild: Green-Yellow
+        let green = 200;
+        let red = (255.0 * ((value - 10.0) / 10.0)) as u8;
+        (red, green, 0)
+    } else if value < 30.0 {
+        // Warm: Yellow-Orange
+        let green = (200.0 * (1.0 - (value - 20.0) / 10.0)) as u8;
+        (255, green, 0)
+    } else {
+        // Hot: Orange-Red
+        let green = (100.0 * (1.0 - (value - 30.0).min(10.0) / 10.0)) as u8;
+        (255, green, 0)
+    };
+
+    Style::new().fg(Color::Rgb(r, g, b))
 }

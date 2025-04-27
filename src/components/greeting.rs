@@ -126,10 +126,11 @@ impl Greeting {
 
     fn get_location_display(&self) -> String {
         let state = self.state.read().unwrap();
+        let location_loading = "🌐 Location is loading...".to_string();
 
         match state.loading_status {
-            LoadingStatus::NotStarted => "Location: Not loaded yet".to_string(),
-            LoadingStatus::Loading => "Location: Loading...".to_string(),
+            LoadingStatus::NotStarted => location_loading,
+            LoadingStatus::Loading => location_loading,
             LoadingStatus::Loaded => {
                 format!("🌐 {}, {}", state.location.city, state.location.country,)
             }
@@ -161,7 +162,7 @@ impl Component for Greeting {
         let location_area = Rect {
             x: area.x + 1,
             y: area.y + 2, // Position below the greeting
-            width: area.width,
+            width: area.width - 2,
             height: 1,
         };
 
