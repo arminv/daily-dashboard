@@ -350,16 +350,11 @@ fn vertical_barchart(
     dates: &[String],
     weekdays: &[String],
 ) -> BarChart<'static> {
-    let bars: Vec<Bar<'static>> = high_temps
+    let bars: Vec<Bar> = high_temps
         .iter()
         .enumerate()
         .map(|(index, high_temp)| {
-            let low_temp = if index < low_temps.len() {
-                low_temps[index]
-            } else {
-                0.0
-            };
-
+            let low_temp = low_temps[index];
             vertical_bar(index, high_temp, &low_temp, dates, weekdays)
         })
         .collect();
