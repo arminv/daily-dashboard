@@ -18,7 +18,6 @@ pub struct WeatherState {
     pub loading_status: LoadingStatus,
     pub daily_high_temperatures: Vec<f32>,
     pub daily_low_temperatures: Vec<f32>,
-    pub daily_dates: Vec<String>,
     pub daily_weekdays: Vec<String>,
 }
 
@@ -191,9 +190,6 @@ impl Weather {
                     let date_str = time_value.as_str().unwrap_or("???");
 
                     if date_str.len() >= 10 {
-                        let month_day = &date_str[5..10];
-                        weather_state.daily_dates.push(month_day.to_string());
-
                         // Get the weekday name
                         weather_state.daily_weekdays.push(
                             NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
@@ -201,7 +197,6 @@ impl Weather {
                                 .unwrap_or_else(|_| "???".to_string()),
                         );
                     } else {
-                        weather_state.daily_dates.push(date_str.to_string());
                         weather_state.daily_weekdays.push("???".to_string());
                     }
                 }
@@ -325,18 +320,17 @@ impl Component for Weather {
                 && matches!(state.loading_status, LoadingStatus::Loaded)
         };
         if has_forecast_data {
-            let (high_temps, low_temps, dates, weekdays) = {
+            let (high_temps, low_temps, weekdays) = {
                 let state = self.state.read().unwrap();
                 (
                     state.daily_high_temperatures.clone(),
                     state.daily_low_temperatures.clone(),
-                    state.daily_dates.clone(),
                     state.daily_weekdays.clone(),
                 )
             };
 
             frame.render_widget(
-                vertical_barchart(&high_temps, &low_temps, &dates, &weekdays),
+                vertical_barchart(&high_temps, &low_temps, &weekdays),
                 padded_chart_area,
             );
         }
@@ -347,7 +341,6 @@ impl Component for Weather {
 fn vertical_barchart(
     high_temps: &[f32],
     low_temps: &[f32],
-    dates: &[String],
     weekdays: &[String],
 ) -> BarChart<'static> {
     let bars: Vec<Bar> = high_temps
@@ -355,7 +348,7 @@ fn vertical_barchart(
         .enumerate()
         .map(|(index, high_temp)| {
             let low_temp = low_temps[index];
-            vertical_bar(index, high_temp, &low_temp, dates, weekdays)
+            vertical_bar(index, high_temp, &low_temp, weekdays)
         })
         .collect();
 
@@ -365,33 +358,25 @@ fn vertical_barchart(
         .label_style(Style::new().fg(Color::Red))
         .bar_gap(1)
         .data(BarGroup::default().bars(&bars))
-        .bar_width(10)
+        .bar_width(5)
 }
 
 fn vertical_bar(
     index: usize,
     high_temp: &f32,
     low_temp: &f32,
-    dates: &[String],
     weekdays: &[String],
 ) -> Bar<'static> {
     // For display, round temperatures to integers
     let high_display = high_temp.round() as i32;
     let low_display = low_temp.round() as i32;
-
-    // Get the weekday and date for this bar
-    let date = if index < dates.len() {
-        &dates[index]
-    } else {
-        "??"
-    };
     let weekday = if index < weekdays.len() {
         &weekdays[index]
     } else {
         "?"
     };
-    let label = Line::from(format!("{weekday} {date}")).alignment(Alignment::Center);
-    let text_value = format!("{low_display}°-{high_display}°");
+    let label = Line::from(weekday.to_string()).alignment(Alignment::Center);
+    let text_value = format!("{low_display}-{high_display}°");
 
     Bar::default()
         .value(*high_temp as u64)
