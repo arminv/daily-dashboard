@@ -108,6 +108,7 @@ impl App {
             return Ok(());
         };
         let action_tx = self.action_tx.clone();
+
         match event {
             Event::Quit => action_tx.send(Action::Quit)?,
             Event::Tick => action_tx.send(Action::Tick)?,
@@ -116,6 +117,7 @@ impl App {
             Event::Key(key) => self.handle_key_event(key)?,
             _ => {}
         }
+
         for component in self.components.iter_mut() {
             if let Some(action) = component.handle_events(Some(event.clone()))? {
                 action_tx.send(action)?;
@@ -129,6 +131,7 @@ impl App {
         let Some(keymap) = self.config.keybindings.get(&self.mode) else {
             return Ok(());
         };
+
         match keymap.get(&vec![key]) {
             Some(action) => {
                 info!("Got action: {action:?}");
@@ -154,6 +157,7 @@ impl App {
             if action != Action::Tick && action != Action::Render {
                 debug!("{action:?}");
             }
+
             match action {
                 Action::Tick => {
                     self.last_tick_key_events.drain(..);
@@ -166,6 +170,7 @@ impl App {
                 Action::Render => self.render(tui)?,
                 _ => {}
             }
+
             for component in self.components.iter_mut() {
                 if let Some(action) = component.update(action.clone())? {
                     self.action_tx.send(action)?
