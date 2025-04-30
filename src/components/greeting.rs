@@ -2,11 +2,10 @@ use super::Component;
 use crate::app::LoadingStatus;
 use chrono::Local;
 use color_eyre::Result;
-use ratatui::style::Color;
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     widgets::{Block, Borders, Paragraph},
 };
 use std::sync::{Arc, RwLock};
@@ -154,13 +153,11 @@ impl Component for Greeting {
             width: area.width,
             height: area.height - 1,
         };
-
         // Create border widget with date as title
         let border_widget = Block::default()
             .title(datetime_str)
             .borders(Borders::ALL)
             .style(Style::default().fg(Color::LightCyan));
-
         // Define areas for content inside the border
         let greeting_area = Rect {
             x: area.x + 2, // Adjusted for border
@@ -168,7 +165,6 @@ impl Component for Greeting {
             width: area.width.min(30),
             height: 2,
         };
-
         let location_area = Rect {
             x: area.x + 2,         // Adjusted for border
             y: area.y + 3,         // Position below the greeting
@@ -182,14 +178,10 @@ impl Component for Greeting {
                 .add_modifier(Modifier::BOLD)
                 .fg(Color::White),
         );
-
         let location_widget =
             Paragraph::new(location_str).style(Style::default().fg(Color::DarkGray));
 
-        // Render border first so other widgets appear on top of it
         frame.render_widget(border_widget, border_area);
-
-        // Render content on top of the border
         frame.render_widget(greeting_widget, greeting_area);
         frame.render_widget(location_widget, location_area);
 

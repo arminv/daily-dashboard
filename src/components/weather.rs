@@ -27,6 +27,9 @@ pub struct Weather {
     greeting_state: Arc<RwLock<super::greeting::GreetingState>>,
 }
 
+// TODO: implement `Default` trait:
+// impl Default for Weather {}
+
 impl Weather {
     pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {
         Self {
@@ -315,13 +318,26 @@ impl Component for Weather {
         };
 
         let has_forecast_data = {
-            let state = self.state.read().unwrap();
+            let state = match self.state.read() {
+                Ok(daily_high_temperatures) => daily_high_temperatures,
+                Err(_) => {
+                    eprintln!("Weather: Failed to read state");
+                    return Ok(());
+                }
+            };
             !state.daily_high_temperatures.is_empty()
                 && matches!(state.loading_status, LoadingStatus::Loaded)
         };
+
         if has_forecast_data {
             let (high_temps, low_temps, weekdays) = {
-                let state = self.state.read().unwrap();
+                let state = match self.state.read() {
+                    Ok(state) => state,
+                    Err(_) => {
+                        eprintln!("Weather: Failed to read state");
+                        return Ok(());
+                    }
+                };
                 (
                     state.daily_high_temperatures.clone(),
                     state.daily_low_temperatures.clone(),

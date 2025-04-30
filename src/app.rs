@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
+use crate::components::calendar::Calendar;
 use crate::components::weather::Weather;
 use crate::{
     action::Action,
@@ -55,6 +56,7 @@ impl App {
             components: vec![
                 Box::new(greeting),
                 Box::new(weather),
+                Box::new(Calendar::default()),
                 // Box::new(FpsCounter::default()),
             ],
             should_quit: false,
