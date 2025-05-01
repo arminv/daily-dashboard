@@ -293,7 +293,7 @@ impl Component for Weather {
         let weather_area = Rect {
             x: area.x + 2,
             y: area.y + 4, // Position below location
-            width: area.width - 2,
+            width: area.width.saturating_sub(2),
             height: 1,
         };
         let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Green));

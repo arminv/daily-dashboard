@@ -153,7 +153,7 @@ impl Component for Greeting {
             x: area.x,
             y: area.y,
             width: area.width,
-            height: area.height - 1,
+            height: area.height.saturating_sub(1),
         };
         // Create border widget with date as title
         let border_widget = Block::default()
@@ -168,9 +168,9 @@ impl Component for Greeting {
             height: 2,
         };
         let location_area = Rect {
-            x: area.x + 2,         // Adjusted for border
-            y: area.y + 3,         // Position below the greeting
-            width: area.width - 4, // Account for the border on both sides
+            x: area.x + 2,             // Adjusted for border
+            y: area.y + 3,             // Position below the greeting
+            width: area.width.min(30), // Account for the border on both sides
             height: 1,
         };
 

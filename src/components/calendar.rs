@@ -33,7 +33,7 @@ impl Component for Calendar {
         let calendar_area = Rect {
             x: area.x + 2,
             y: area.y + 14,
-            width: area.width - 40,
+            width: area.width.saturating_sub(40),
             height: 8,
         };
         let date = OffsetDateTime::now_local()

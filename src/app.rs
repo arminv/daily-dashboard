@@ -190,6 +190,11 @@ impl App {
 
     fn render(&mut self, tui: &mut Tui) -> Result<()> {
         tui.draw(|frame| {
+            let is_too_narrow = (frame.area().width as f64) < 20.0;
+            if is_too_narrow {
+                return;
+            }
+
             for component in self.components.iter_mut() {
                 if let Err(err) = component.draw(frame, frame.area()) {
                     let _ = self
