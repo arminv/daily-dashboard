@@ -79,6 +79,7 @@ impl Weather {
         // Check if location data is ready
         let location_data = {
             let greeting_state = self.greeting_state.read().unwrap();
+
             if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                 info!(
                     "Weather: Location not loaded yet (status: {:?}), will retry later",
@@ -93,12 +94,13 @@ impl Weather {
                 greeting_state.location.city.clone(),
                 greeting_state.location.latitude,
                 greeting_state.location.longitude,
+                greeting_state.location.timezone.clone(),
             )
         };
 
-        let (city, lat, lon) = location_data;
+        let (city, lat, lon, timezone) = location_data;
         let api_url = format!(
-            "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7",
+            "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7&timezone={timezone}",
         );
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
@@ -190,7 +192,6 @@ impl Weather {
                     let date_str = time_value.as_str().unwrap_or("???");
 
                     if date_str.len() >= 10 {
-                        // Get the weekday name
                         weather_state.daily_weekdays.push(
                             NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                                 .map(|date| date.weekday().to_string())

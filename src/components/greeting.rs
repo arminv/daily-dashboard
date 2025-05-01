@@ -16,6 +16,7 @@ pub struct LocationState {
     pub country: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub timezone: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -79,6 +80,7 @@ impl Greeting {
                             country: ip_info.country,
                             latitude: ip_info.latitude.parse().unwrap_or(0.0),
                             longitude: ip_info.longitude.parse().unwrap_or(0.0),
+                            timezone: ip_info.timezone,
                         };
                         let mut state = self.state.write().unwrap();
 

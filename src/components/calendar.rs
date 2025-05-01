@@ -1,10 +1,14 @@
 use crate::action::Action;
 use crate::components::Component;
 use color_eyre::Result;
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use ratatui::prelude::{Color, Style, Stylize};
-use ratatui::widgets::calendar::{CalendarEventStore, Monthly};
+use ratatui::{
+    layout::Rect,
+    prelude::{Color, Style, Stylize},
+    widgets::{
+        calendar::{CalendarEventStore, Monthly}
+    },
+    Frame
+};
 use time::OffsetDateTime;
 
 #[derive(Debug)]
