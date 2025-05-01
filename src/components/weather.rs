@@ -372,7 +372,7 @@ fn vertical_barchart(
         .label_style(Style::new().fg(Color::Red))
         .bar_gap(1)
         .data(BarGroup::default().bars(&bars))
-        .bar_width(5)
+        .bar_width(6)
 }
 
 fn vertical_bar(
