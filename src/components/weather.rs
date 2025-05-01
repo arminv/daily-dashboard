@@ -21,14 +21,11 @@ pub struct WeatherState {
     pub daily_weekdays: Vec<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Weather {
     state: Arc<RwLock<WeatherState>>,
     greeting_state: Arc<RwLock<super::greeting::GreetingState>>,
 }
-
-// TODO: implement `Default` trait:
-// impl Default for Weather {}
 
 impl Weather {
     pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {

@@ -7,6 +7,7 @@ use ratatui::prelude::{Color, Style, Stylize};
 use ratatui::widgets::calendar::{CalendarEventStore, Monthly};
 use time::OffsetDateTime;
 
+#[derive(Debug)]
 pub struct Calendar {}
 
 impl Default for Calendar {
@@ -33,7 +34,9 @@ impl Component for Calendar {
             width: area.width - 40,
             height: 8,
         };
-        let date = OffsetDateTime::now_utc().date();
+        let date = OffsetDateTime::now_local()
+            .unwrap_or_else(|_| OffsetDateTime::now_utc())
+            .date();
         let monthly = Monthly::new(date, CalendarEventStore::today(Style::new().red().bold()))
             // .block(Block::new().padding(Padding::new(0, 0, 2, 0)))
             .show_month_header(Style::new().bold().fg(Color::Red))
