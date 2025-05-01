@@ -309,9 +309,9 @@ impl Component for Weather {
             .split(area);
         let main_area = layout[2];
         let padded_chart_area = Rect {
-            x: main_area.x + 1, // Add left padding
+            x: main_area.x + 2, // Add left padding
             y: main_area.y + 2,
-            width: main_area.width.saturating_sub(2),
+            width: main_area.width.saturating_sub(4),
             ..main_area
         };
 
