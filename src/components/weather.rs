@@ -184,22 +184,14 @@ impl Weather {
             let temp_min_array = daily.get("temperature_2m_min");
             let time_array = daily.get("time");
 
-            // Process dates and weekdays
-            if let (Some(_), Some(time_values)) =
-                (time_array, time_array.and_then(|a| a.as_array()))
-            {
+            if let Some(time_values) = time_array.and_then(|a| a.as_array()) {
                 for time_value in time_values {
                     let date_str = time_value.as_str().unwrap_or("???");
-
-                    if date_str.len() >= 10 {
-                        weather_state.daily_weekdays.push(
-                            NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                                .map(|date| date.weekday().to_string())
-                                .unwrap_or_else(|_| "???".to_string()),
-                        );
-                    } else {
-                        weather_state.daily_weekdays.push("???".to_string());
-                    }
+                    weather_state.daily_weekdays.push(
+                        NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                            .map(|date| date.weekday().to_string())
+                            .unwrap_or("???".to_string()),
+                    );
                 }
             }
 
