@@ -40,7 +40,6 @@ impl Weather {
         state.loading_status = status;
     }
 
-    // Helper method to convert weather code to description
     fn get_weather_description(&self, code: u32) -> String {
         match code {
             0 => "Clear sky".to_string(),
@@ -57,7 +56,6 @@ impl Weather {
         }
     }
 
-    // Helper method to get weather icon
     fn get_weather_icon(&self, code: u32) -> String {
         match code {
             0 => "☀️".to_string(),

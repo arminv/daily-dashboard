@@ -38,7 +38,7 @@ impl Component for Calendar {
             height: 8,
         };
         let today = OffsetDateTime::now_local()
-            .unwrap_or_else(|_| OffsetDateTime::now_utc())
+            .unwrap_or(OffsetDateTime::now_utc())
             .date()
             .to_string()
             .bold()
@@ -54,7 +54,7 @@ impl Component for Calendar {
             height: 5,
         };
         let date = OffsetDateTime::now_local()
-            .unwrap_or_else(|_| OffsetDateTime::now_utc())
+            .unwrap_or(OffsetDateTime::now_utc())
             .date();
         let monthly = Monthly::new(date, CalendarEventStore::today(Style::new().red().bold()))
             // .block(Block::new().padding(Padding::new(0, 0, 2, 0)))
