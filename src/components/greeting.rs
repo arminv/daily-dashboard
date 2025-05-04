@@ -9,6 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 use std::sync::{Arc, RwLock};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, Default)]
 pub struct LocationState {
@@ -62,17 +63,15 @@ impl Greeting {
 
         match self.get_public_ip().await {
             Ok(ip) => {
-                tracing::info!("Public IP detected: {}", ip);
+                info!("Public IP detected: {}", ip);
 
                 let service = ipgeolocate::Service::IpApi;
 
                 match ipgeolocate::Locator::get(&ip, service).await {
                     Ok(ip_info) => {
-                        tracing::info!(
+                        info!(
                             "IP Location found: {} - {} ({})",
-                            ip_info.ip,
-                            ip_info.city,
-                            ip_info.country
+                            ip_info.ip, ip_info.city, ip_info.country
                         );
 
                         let location_data = LocationState {
@@ -83,18 +82,17 @@ impl Greeting {
                             timezone: ip_info.timezone,
                         };
                         let mut state = self.state.write().unwrap();
-
                         state.location = location_data;
                         state.loading_status = LoadingStatus::Loaded;
                     }
                     Err(error) => {
-                        tracing::error!("Error fetching IP location: {}", error);
+                        error!("Error fetching IP location: {}", error);
                         self.set_loading_state(LoadingStatus::Error(error.to_string()));
                     }
                 }
             }
             Err(error) => {
-                tracing::error!("Error fetching public IP: {}", error);
+                error!("Error fetching public IP: {}", error);
                 self.set_loading_state(LoadingStatus::Error(format!(
                     "Failed to get public IP: {error:?}",
                 )));
