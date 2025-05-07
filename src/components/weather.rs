@@ -230,7 +230,7 @@ impl Weather {
             LoadingStatus::Loading => location_loading,
             LoadingStatus::Loaded => {
                 format!(
-                    "{}{}{} {:.1}°C {} ({})",
+                    "{}{}{} {:.1}°C {} (wind: {})",
                     state.icon,
                     state.icon,
                     state.icon,
