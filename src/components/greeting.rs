@@ -111,10 +111,10 @@ impl Greeting {
         for api_url in ip_apis {
             match reqwest::get(api_url).await {
                 Ok(response) => {
-                    if let Ok(ip) = response.text().await {
-                        if !ip.trim().is_empty() {
-                            return Ok(ip.trim().to_string());
-                        }
+                    if let Ok(ip) = response.text().await
+                        && !ip.trim().is_empty()
+                    {
+                        return Ok(ip.trim().to_string());
                     }
                 }
                 Err(_) => continue, // Try the next API if this one fails

@@ -156,27 +156,27 @@ impl Weather {
         let mut weather_state = self.state.write().unwrap();
         weather_state.city = city;
 
-        if let Some(temp) = current.get("temperature_2m") {
-            if let Some(value) = temp.as_f64() {
-                weather_state.temperature = value as f32;
-                info!("Weather: Temperature: {}", value);
-            }
+        if let Some(temp) = current.get("temperature_2m")
+            && let Some(value) = temp.as_f64()
+        {
+            weather_state.temperature = value as f32;
+            info!("Weather: Temperature: {}", value);
         }
 
-        if let Some(wind) = current.get("wind_speed_10m") {
-            if let Some(value) = wind.as_f64() {
-                weather_state.wind = format!("{value:.1} km/h");
-                info!("Weather: Wind: {value:?}");
-            }
+        if let Some(wind) = current.get("wind_speed_10m")
+            && let Some(value) = wind.as_f64()
+        {
+            weather_state.wind = format!("{value:.1} km/h");
+            info!("Weather: Wind: {value:?}");
         }
 
-        if let Some(code) = current.get("weather_code") {
-            if let Some(value) = code.as_u64() {
-                let code_value = value as u32;
-                weather_state.description = self.get_weather_description(code_value);
-                weather_state.icon = self.get_weather_icon(code_value);
-                info!("Weather: Code {}: {}", value, weather_state.description);
-            }
+        if let Some(code) = current.get("weather_code")
+            && let Some(value) = code.as_u64()
+        {
+            let code_value = value as u32;
+            weather_state.description = self.get_weather_description(code_value);
+            weather_state.icon = self.get_weather_icon(code_value);
+            info!("Weather: Code {}: {}", value, weather_state.description);
         }
 
         // Extract daily forecast data
