@@ -1,7 +1,7 @@
 use super::Component;
 use crate::action::Action;
 use crate::app::LoadingStatus;
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
@@ -19,6 +19,7 @@ pub struct WeatherState {
     pub daily_high_temperatures: Vec<f32>,
     pub daily_low_temperatures: Vec<f32>,
     pub daily_weekdays: Vec<String>,
+    pub last_updated_at: Option<chrono::DateTime<Local>>,
 }
 
 #[derive(Clone, Debug)]
@@ -26,6 +27,8 @@ pub struct Weather {
     state: Arc<RwLock<WeatherState>>,
     greeting_state: Arc<RwLock<super::greeting::GreetingState>>,
 }
+
+const REFETCH_WEATHER_IN_MINUTES: i64 = 10;
 
 impl Weather {
     pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {
@@ -217,6 +220,7 @@ impl Weather {
         }
 
         weather_state.loading_status = LoadingStatus::Loaded;
+        weather_state.last_updated_at = Some(chrono::Local::now());
         info!("Weather: Successfully loaded weather data");
     }
 
@@ -253,24 +257,38 @@ impl Weather {
 impl Component for Weather {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
+            let now = Local::now();
             let should_fetch = {
                 let weather_state = self.state.read().unwrap();
                 let greeting_state = self.greeting_state.read().unwrap();
 
-                // Only fetch if:
-                // 1. Location is loaded
-                // 2. Weather is not loaded, or had an error, or is still loading for too long
-                matches!(greeting_state.loading_status, LoadingStatus::Loaded)
-                    && matches!(
-                        weather_state.loading_status,
-                        LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                    )
+                // Check if the location is loaded
+                let is_location_ready =
+                    matches!(greeting_state.loading_status, LoadingStatus::Loaded);
+
+                // Check if weather needs initial loading or had an error
+                let is_initial_load = matches!(
+                    weather_state.loading_status,
+                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
+                );
+
+                // Check if 5 minutes have passed since the last update
+                let should_refresh = match weather_state.last_updated_at {
+                    Some(last_updated) => {
+                        let duration = now.signed_duration_since(last_updated);
+                        // Refresh if more than n minutes have passed
+                        duration.num_minutes() >= REFETCH_WEATHER_IN_MINUTES
+                    }
+                    None => true, // No previous update, so fetch
+                };
+
+                is_location_ready && (is_initial_load || should_refresh)
             };
 
             if should_fetch {
                 let this = self.clone();
                 tokio::spawn(async move {
-                    info!("Weather: Trying fetch from tick event - location data is ready");
+                    info!("Weather: Fetching weather data");
                     this.fetch_weather_data().await;
                 });
             }
