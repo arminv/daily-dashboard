@@ -181,6 +181,11 @@ impl Weather {
 
         // Extract daily forecast data
         if let Some(daily) = json.get("daily") {
+            // Clear existing data to avoid accumulation
+            weather_state.daily_weekdays.clear();
+            weather_state.daily_high_temperatures.clear();
+            weather_state.daily_low_temperatures.clear();
+
             let temp_max_array = daily.get("temperature_2m_max");
             let temp_min_array = daily.get("temperature_2m_min");
             let time_array = daily.get("time");
