@@ -225,7 +225,7 @@ impl Weather {
         }
 
         weather_state.loading_status = LoadingStatus::Loaded;
-        weather_state.last_updated_at = Some(chrono::Local::now());
+        weather_state.last_updated_at = Some(Local::now());
         info!("Weather: Successfully loaded weather data");
     }
 
@@ -262,7 +262,6 @@ impl Weather {
 impl Component for Weather {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
-            let now = Local::now();
             let should_fetch = {
                 let weather_state = self.state.read().unwrap();
                 let greeting_state = self.greeting_state.read().unwrap();
@@ -278,6 +277,7 @@ impl Component for Weather {
                 );
 
                 // Check if 5 minutes have passed since the last update
+                let now = Local::now();
                 let should_refresh = match weather_state.last_updated_at {
                     Some(last_updated) => {
                         let duration = now.signed_duration_since(last_updated);
