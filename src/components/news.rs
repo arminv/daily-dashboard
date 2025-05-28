@@ -4,9 +4,9 @@ use crate::{action::Action, tui::Event};
 use chrono::Local;
 use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
-use ratatui::layout::Rect;
-use ratatui::widgets::TableState;
 use ratatui::Frame;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Row, TableState};
 use std::sync::{Arc, RwLock};
 use tracing::{error, info};
 
@@ -87,9 +87,19 @@ impl News {
         // info!("News: Parsed JSON: {:?}", json);
 
         // Extract the weather data
-        let current = match json.get("Business") {
-            // TODO:
-            Some(current) => current,
+        let articles: Vec<NewsArticle> = match json.get("Business") {
+            // TODO: expand to more articles than 5:
+            Some(values) => values.as_array().unwrap()[0..5]
+                .iter()
+                .map(|article| {
+                    let article_object = article.as_object().unwrap();
+                    NewsArticle {
+                        title: article_object.get("title").unwrap().to_string(),
+                        link: article_object.get("link").unwrap().to_string(),
+                        source: article_object.get("source").unwrap().to_string(),
+                    }
+                })
+                .collect(),
             None => {
                 let error_msg = "No 'Business' field in response".to_string();
                 error!("News: {}", error_msg);
@@ -98,24 +108,11 @@ impl News {
             }
         };
 
-        // TODO:
-        // let mut news_state = self.state.write().unwrap();
-        // news_state.news_articles = current;
-
-        info!(
-            "News: Current:{:?} ------ {:?}",
-            current,
-            self.state.read().unwrap()
-        );
-        //
-        // if let Some(code) = current.get("weather_code")
-        //     && let Some(value) = code.as_u64()
-        // {
-        //     let code_value = value as u32;
-        //     news_state.description = self.get_weather_description(code_value);
-        //     news_state.icon = self.get_weather_icon(code_value);
-        //     info!("Weather: Code {}: {}", value, news_state.description);
-        // }
+        let mut news_state = self.state.write().unwrap();
+        news_state.news_articles = articles;
+        news_state.last_updated_at = Some(Local::now());
+        news_state.loading_status = LoadingStatus::Loaded;
+        info!("News: Loaded news data");
     }
 }
 
@@ -183,7 +180,15 @@ impl Component for News {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
+    // TODO:
+    fn draw(&mut self, _frame: &mut Frame, _area: Rect) -> Result<(), ErrReport> {
         Ok(())
+    }
+}
+
+impl From<&NewsArticle> for Row<'_> {
+    fn from(article: &NewsArticle) -> Self {
+        let article = article.clone();
+        Row::new(vec![article.title, article.source, article.link])
     }
 }
