@@ -45,7 +45,7 @@ tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "serde"] }
 whoami = "1.6.0"
 chrono = "0.4"
-time = "0.3.41"
+time = "0.3.47"
 
 [build-dependencies]
 anyhow = "1.0.90"
