@@ -15,6 +15,7 @@ pub struct NewsArticle {
     pub title: String,
     pub link: String,
     pub source: String,
+    pub date: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -84,29 +85,71 @@ impl News {
             }
         };
 
-        // info!("News: Parsed JSON: {:?}", json);
+        // Debug: Log first article structure to understand date format
+        if let Some(first_article) = json.get("Business").and_then(|b| b.as_array()).and_then(|arr| arr.get(0)) {
+            info!("News: First article structure: {:?}", first_article);
+        }
 
-        // Extract the weather data
-        let articles: Vec<NewsArticle> = match json.get("Business") {
-            // TODO: expand to more articles than 5:
-            Some(values) => values.as_array().unwrap()[0..5]
-                .iter()
-                .map(|article| {
-                    let article_object = article.as_object().unwrap();
-                    NewsArticle {
-                        title: article_object.get("title").unwrap().to_string(),
-                        link: article_object.get("link").unwrap().to_string(),
-                        source: article_object.get("source").unwrap().to_string(),
-                    }
-                })
-                .collect(),
-            None => {
-                let error_msg = "No 'Business' field in response".to_string();
-                error!("News: {}", error_msg);
-                self.set_loading_state(LoadingStatus::Error(error_msg));
-                return;
+        // Extract all available articles from different categories
+        let mut articles: Vec<NewsArticle> = Vec::new();
+        
+        // Collect articles from all categories
+        for category in ["Business", "Technology", "Sports", "Politics", "Health", "Entertainment"] {
+            if let Some(values) = json.get(category) {
+                if let Some(array) = values.as_array() {
+                    let category_articles: Vec<NewsArticle> = array
+                        .iter()
+                        .take(10) // Take up to 10 from each category
+                        .filter_map(|article| {
+                            let article_object = article.as_object()?;
+                            Some(NewsArticle {
+                                title: article_object.get("title")?.as_str()?.trim_matches('"').to_string(),
+                                link: article_object.get("link")?.as_str()?.trim_matches('"').to_string(),
+                                source: article_object.get("source")?.as_str()?.trim_matches('"').to_string(),
+                                date: {
+                                    // Try different possible date field names
+                                    let date_str = article_object.get("date")
+                                        .or_else(|| article_object.get("published"))
+                                        .or_else(|| article_object.get("publishedAt"))
+                                        .or_else(|| article_object.get("pub_date"))
+                                        .or_else(|| article_object.get("time"))
+                                        .and_then(|d| d.as_str())
+                                        .map(|s| s.trim_matches('"'))
+                                        .unwrap_or("No date");
+                                    
+                                    // Try to parse and format the date
+                                    if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc3339(date_str) {
+                                        parsed_date.format("%m/%d %H:%M").to_string()
+                                    } else if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc2822(date_str) {
+                                        parsed_date.format("%m/%d %H:%M").to_string()
+                                    } else if let Ok(parsed_date) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") {
+                                        parsed_date.format("%m/%d %H:%M").to_string()
+                                    } else {
+                                        // If parsing fails, show the raw string or "No date"
+                                        if date_str != "No date" && !date_str.is_empty() {
+                                            date_str.to_string()
+                                        } else {
+                                            "No date".to_string()
+                                        }
+                                    }
+                                },
+                            })
+                        })
+                        .collect();
+                    articles.extend(category_articles);
+                }
             }
-        };
+        }
+        
+        // Limit to 50 articles total
+        articles.truncate(50);
+        
+        if articles.is_empty() {
+            let error_msg = "No articles found in response".to_string();
+            error!("News: {}", error_msg);
+            self.set_loading_state(LoadingStatus::Error(error_msg));
+            return;
+        }
 
         let mut news_state = self.state.write().unwrap();
         news_state.news_articles = articles;
@@ -121,12 +164,35 @@ impl Component for News {
         match event {
             Some(Event::Key(key_event)) => match key_event.code {
                 KeyCode::Char('i') | KeyCode::Up => {
-                    info!("News: Scrolling up!");
-                    self.state.write().unwrap().table_state.scroll_up_by(1)
+                    let mut state = self.state.write().unwrap();
+                    let selected = state.table_state.selected().unwrap_or(0);
+                    if selected > 0 {
+                        state.table_state.select(Some(selected - 1));
+                    }
+                    info!("News: Scrolling up to {}", state.table_state.selected().unwrap_or(0));
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
-                    info!("News: Scrolling down!");
-                    self.state.write().unwrap().table_state.scroll_down_by(1)
+                    let mut state = self.state.write().unwrap();
+                    let selected = state.table_state.selected().unwrap_or(0);
+                    let max_index = state.news_articles.len().saturating_sub(1);
+                    if selected < max_index {
+                        state.table_state.select(Some(selected + 1));
+                    }
+                    info!("News: Scrolling down to {}", state.table_state.selected().unwrap_or(0));
+                }
+                KeyCode::Enter => {
+                    let state = self.state.read().unwrap();
+                    if let Some(selected) = state.table_state.selected() {
+                        if let Some(article) = state.news_articles.get(selected) {
+                            let url = article.link.trim_matches('"');
+                            info!("News: Opening URL: {}", url);
+                            
+                            // Try to open the URL in the default browser
+                            if let Err(e) = open::that(url) {
+                                error!("News: Failed to open URL {}: {}", url, e);
+                            }
+                        }
+                    }
                 }
                 _ => {}
             },
@@ -139,49 +205,127 @@ impl Component for News {
 
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::Tick {
-            // let should_fetch = {
-            //     let weather_state = self.state.read().unwrap();
-            //
-            //     // Check if weather needs initial loading or had an error
-            //     let is_initial_load = matches!(
-            //         weather_state.loading_status,
-            //         LoadingStatus::NotStarted | LoadingStatus::Error(_)
-            //     );
-            //
-            //     // Check if 5 minutes have passed since the last update
-            //     let now = Local::now();
-            //     let should_refresh = match weather_state.last_updated_at {
-            //         Some(last_updated) => {
-            //             let duration = now.signed_duration_since(last_updated);
-            //             // Refresh if more than n minutes have passed
-            //             duration.num_minutes() >= 10
-            //         }
-            //         None => true, // No previous update, so fetch
-            //     };
-            //
-            //     is_initial_load || should_refresh
-            // };
+            let should_fetch = {
+                let news_state = self.state.read().unwrap();
 
-            // if should_fetch {
-            //     let this = self.clone();
-            //     tokio::spawn(async move {
-            //         info!("Weather: Fetching weather data");
-            //         this.fetch_weather_data().await;
-            //     });
-            // }
+                // Check if news needs initial loading or had an error
+                let is_initial_load = matches!(
+                    news_state.loading_status,
+                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
+                );
 
-            let this = self.clone();
-            tokio::spawn(async move {
-                info!("News: Fetching news data");
-                this.fetch_news_data().await;
-            });
+                // Check if 30 minutes have passed since the last update
+                let now = Local::now();
+                let should_refresh = match news_state.last_updated_at {
+                    Some(last_updated) => {
+                        let duration = now.signed_duration_since(last_updated);
+                        // Refresh if more than 30 minutes have passed
+                        duration.num_minutes() >= 30
+                    }
+                    None => true, // No previous update, so fetch
+                };
+
+                is_initial_load || should_refresh
+            };
+
+            if should_fetch {
+                let this = self.clone();
+                tokio::spawn(async move {
+                    info!("News: Fetching news data");
+                    this.fetch_news_data().await;
+                });
+            }
         }
 
         Ok(None)
     }
 
-    // TODO:
-    fn draw(&mut self, _frame: &mut Frame, _area: Rect) -> Result<(), ErrReport> {
+    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
+        use ratatui::{
+            style::{Color, Modifier, Style},
+            text::Span,
+            widgets::{Block, Borders, Cell, Row, Table},
+        };
+
+        let news_state = self.state.read().unwrap();
+
+        match &news_state.loading_status {
+            LoadingStatus::NotStarted => {
+                let block = Block::default()
+                    .title("News")
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::White));
+                frame.render_widget(block, area);
+            }
+            LoadingStatus::Loading => {
+                let block = Block::default()
+                    .title("News - Loading...")
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::Yellow));
+                frame.render_widget(block, area);
+            }
+            LoadingStatus::Error(error) => {
+                let block = Block::default()
+                    .title(format!("News - Error: {}", error))
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::Red));
+                frame.render_widget(block, area);
+            }
+            LoadingStatus::Loaded => {
+                let last_updated = news_state
+                    .last_updated_at
+                    .map(|dt| dt.format("%H:%M").to_string())
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                let title = format!("News ({} articles) - Updated: {}", news_state.news_articles.len(), last_updated);
+
+                let header = Row::new(vec![
+                    Cell::from(Span::styled("Title", Style::default().add_modifier(Modifier::BOLD))),
+                    Cell::from(Span::styled("Source", Style::default().add_modifier(Modifier::BOLD))),
+                    Cell::from(Span::styled("Date", Style::default().add_modifier(Modifier::BOLD))),
+                ])
+                .style(Style::default().fg(Color::Yellow))
+                .height(1);
+
+                let rows: Vec<Row> = news_state
+                    .news_articles
+                    .iter()
+                    .map(|article| {
+                        Row::new(vec![
+                            Cell::from(article.title.clone()),
+                            Cell::from(article.source.clone()),
+                            Cell::from(article.date.clone()),
+                        ])
+                        .height(1)
+                    })
+                    .collect();
+
+                // Position news widget in the right portion of the screen, below weather
+                let news_area = Rect {
+                    x: area.x + 2,
+                    y: area.y + 13, // Position below weather forecast (4 + 8 + 1 spacing)
+                    width: area.width.saturating_sub(4),
+                    height: area.height.saturating_sub(15), // Leave space for other components
+                };
+
+                let table = Table::new(rows, [ratatui::layout::Constraint::Percentage(60), ratatui::layout::Constraint::Percentage(25), ratatui::layout::Constraint::Percentage(15)])
+                    .header(header)
+                    .block(
+                        Block::default()
+                            .title(title)
+                            .borders(Borders::ALL)
+                            .style(Style::default().fg(Color::White)),
+                    )
+                    .row_highlight_style(Style::default().bg(Color::DarkGray))
+                    .highlight_symbol("> ");
+
+                // We need to work with the actual table state, not a clone
+                drop(news_state); // Release the read lock
+                let mut state_write = self.state.write().unwrap();
+                frame.render_stateful_widget(table, news_area, &mut state_write.table_state);
+            }
+        }
+
         Ok(())
     }
 }
@@ -189,6 +333,6 @@ impl Component for News {
 impl From<&NewsArticle> for Row<'_> {
     fn from(article: &NewsArticle) -> Self {
         let article = article.clone();
-        Row::new(vec![article.title, article.source, article.link])
+        Row::new(vec![article.title, article.source, article.date])
     }
 }
