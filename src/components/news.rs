@@ -86,63 +86,97 @@ impl News {
         };
 
         // Debug: Log first article structure to understand date format
-        if let Some(first_article) = json.get("Business").and_then(|b| b.as_array()).and_then(|arr| arr.first()) {
+        if let Some(first_article) = json
+            .get("Business")
+            .and_then(|b| b.as_array())
+            .and_then(|arr| arr.first())
+        {
             info!("News: First article structure: {:?}", first_article);
         }
 
         // Extract all available articles from different categories
         let mut articles: Vec<NewsArticle> = Vec::new();
-        
+
         // Collect articles from all categories
-        for category in ["Business", "Technology", "Sports", "Politics", "Health", "Entertainment"] {
+        for category in [
+            "Business",
+            "Technology",
+            "Sports",
+            "Politics",
+            "Health",
+            "Entertainment",
+        ] {
             if let Some(values) = json.get(category)
-                && let Some(array) = values.as_array() {
-                    let category_articles: Vec<NewsArticle> = array
-                        .iter()
-                        .take(10) // Take up to 10 from each category
-                        .filter_map(|article| {
-                            let article_object = article.as_object()?;
-                            Some(NewsArticle {
-                                title: article_object.get("title")?.as_str()?.trim_matches('"').to_string(),
-                                link: article_object.get("link")?.as_str()?.trim_matches('"').to_string(),
-                                source: article_object.get("source")?.as_str()?.trim_matches('"').to_string(),
-                                date: {
-                                    // Try different possible date field names
-                                    let date_str = article_object.get("date")
-                                        .or_else(|| article_object.get("published"))
-                                        .or_else(|| article_object.get("publishedAt"))
-                                        .or_else(|| article_object.get("pub_date"))
-                                        .or_else(|| article_object.get("time"))
-                                        .and_then(|d| d.as_str())
-                                        .map(|s| s.trim_matches('"'))
-                                        .unwrap_or("No date");
-                                    
-                                    // Try to parse and format the date
-                                    if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc3339(date_str) {
-                                        parsed_date.format("%m/%d %H:%M").to_string()
-                                    } else if let Ok(parsed_date) = chrono::DateTime::parse_from_rfc2822(date_str) {
-                                        parsed_date.format("%m/%d %H:%M").to_string()
-                                    } else if let Ok(parsed_date) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S") {
-                                        parsed_date.format("%m/%d %H:%M").to_string()
+                && let Some(array) = values.as_array()
+            {
+                let category_articles: Vec<NewsArticle> = array
+                    .iter()
+                    .take(10) // Take up to 10 from each category
+                    .filter_map(|article| {
+                        let article_object = article.as_object()?;
+                        Some(NewsArticle {
+                            title: article_object
+                                .get("title")?
+                                .as_str()?
+                                .trim_matches('"')
+                                .to_string(),
+                            link: article_object
+                                .get("link")?
+                                .as_str()?
+                                .trim_matches('"')
+                                .to_string(),
+                            source: article_object
+                                .get("source")?
+                                .as_str()?
+                                .trim_matches('"')
+                                .to_string(),
+                            date: {
+                                // Try different possible date field names
+                                let date_str = article_object
+                                    .get("date")
+                                    .or_else(|| article_object.get("published"))
+                                    .or_else(|| article_object.get("publishedAt"))
+                                    .or_else(|| article_object.get("pub_date"))
+                                    .or_else(|| article_object.get("time"))
+                                    .and_then(|d| d.as_str())
+                                    .map(|s| s.trim_matches('"'))
+                                    .unwrap_or("No date");
+
+                                // Try to parse and format the date
+                                if let Ok(parsed_date) =
+                                    chrono::DateTime::parse_from_rfc3339(date_str)
+                                {
+                                    parsed_date.format("%m/%d %H:%M").to_string()
+                                } else if let Ok(parsed_date) =
+                                    chrono::DateTime::parse_from_rfc2822(date_str)
+                                {
+                                    parsed_date.format("%m/%d %H:%M").to_string()
+                                } else if let Ok(parsed_date) =
+                                    chrono::NaiveDateTime::parse_from_str(
+                                        date_str,
+                                        "%Y-%m-%d %H:%M:%S",
+                                    )
+                                {
+                                    parsed_date.format("%m/%d %H:%M").to_string()
+                                } else {
+                                    // If parsing fails, show the raw string or "No date"
+                                    if date_str != "No date" && !date_str.is_empty() {
+                                        date_str.to_string()
                                     } else {
-                                        // If parsing fails, show the raw string or "No date"
-                                        if date_str != "No date" && !date_str.is_empty() {
-                                            date_str.to_string()
-                                        } else {
-                                            "No date".to_string()
-                                        }
+                                        "No date".to_string()
                                     }
-                                },
-                            })
+                                }
+                            },
                         })
-                        .collect();
-                    articles.extend(category_articles);
-                }
+                    })
+                    .collect();
+                articles.extend(category_articles);
+            }
         }
-        
+
         // Limit to 50 articles total
         articles.truncate(50);
-        
+
         if articles.is_empty() {
             let error_msg = "No articles found in response".to_string();
             error!("News: {}", error_msg);
@@ -168,7 +202,10 @@ impl Component for News {
                     if selected > 0 {
                         state.table_state.select(Some(selected - 1));
                     }
-                    info!("News: Scrolling up to {}", state.table_state.selected().unwrap_or(0));
+                    info!(
+                        "News: Scrolling up to {}",
+                        state.table_state.selected().unwrap_or(0)
+                    );
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
                     let mut state = self.state.write().unwrap();
@@ -177,20 +214,24 @@ impl Component for News {
                     if selected < max_index {
                         state.table_state.select(Some(selected + 1));
                     }
-                    info!("News: Scrolling down to {}", state.table_state.selected().unwrap_or(0));
+                    info!(
+                        "News: Scrolling down to {}",
+                        state.table_state.selected().unwrap_or(0)
+                    );
                 }
                 KeyCode::Enter => {
                     let state = self.state.read().unwrap();
                     if let Some(selected) = state.table_state.selected()
-                        && let Some(article) = state.news_articles.get(selected) {
-                            let url = article.link.trim_matches('"');
-                            info!("News: Opening URL: {}", url);
-                            
-                            // Try to open the URL in the default browser
-                            if let Err(e) = open::that(url) {
-                                error!("News: Failed to open URL {}: {}", url, e);
-                            }
+                        && let Some(article) = state.news_articles.get(selected)
+                    {
+                        let url = article.link.trim_matches('"');
+                        info!("News: Opening URL: {}", url);
+
+                        // Try to open the URL in the default browser
+                        if let Err(e) = open::that(url) {
+                            error!("News: Failed to open URL {}: {}", url, e);
                         }
+                    }
                 }
                 _ => {}
             },
@@ -275,12 +316,25 @@ impl Component for News {
                     .map(|dt| dt.format("%H:%M").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
 
-                let title = format!("News ({} articles) - Updated: {}", news_state.news_articles.len(), last_updated);
+                let title = format!(
+                    "News ({} articles) - Updated: {}",
+                    news_state.news_articles.len(),
+                    last_updated
+                );
 
                 let header = Row::new(vec![
-                    Cell::from(Span::styled("Title", Style::default().add_modifier(Modifier::BOLD))),
-                    Cell::from(Span::styled("Source", Style::default().add_modifier(Modifier::BOLD))),
-                    Cell::from(Span::styled("Date", Style::default().add_modifier(Modifier::BOLD))),
+                    Cell::from(Span::styled(
+                        "Title",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Cell::from(Span::styled(
+                        "Source",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Cell::from(Span::styled(
+                        "Date",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
                 ])
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
@@ -306,16 +360,23 @@ impl Component for News {
                     height: area.height.saturating_sub(15), // Leave space for other components
                 };
 
-                let table = Table::new(rows, [ratatui::layout::Constraint::Percentage(60), ratatui::layout::Constraint::Percentage(25), ratatui::layout::Constraint::Percentage(15)])
-                    .header(header)
-                    .block(
-                        Block::default()
-                            .title(title)
-                            .borders(Borders::ALL)
-                            .style(Style::default().fg(Color::White)),
-                    )
-                    .row_highlight_style(Style::default().bg(Color::DarkGray))
-                    .highlight_symbol("> ");
+                let table = Table::new(
+                    rows,
+                    [
+                        ratatui::layout::Constraint::Percentage(60),
+                        ratatui::layout::Constraint::Percentage(25),
+                        ratatui::layout::Constraint::Percentage(15),
+                    ],
+                )
+                .header(header)
+                .block(
+                    Block::default()
+                        .title(title)
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White)),
+                )
+                .row_highlight_style(Style::default().bg(Color::DarkGray))
+                .highlight_symbol("> ");
 
                 // We need to work with the actual table state, not a clone
                 drop(news_state); // Release the read lock
