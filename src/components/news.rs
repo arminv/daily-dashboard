@@ -86,7 +86,7 @@ impl News {
         };
 
         // Debug: Log first article structure to understand date format
-        if let Some(first_article) = json.get("Business").and_then(|b| b.as_array()).and_then(|arr| arr.get(0)) {
+        if let Some(first_article) = json.get("Business").and_then(|b| b.as_array()).and_then(|arr| arr.first()) {
             info!("News: First article structure: {:?}", first_article);
         }
 
@@ -95,8 +95,8 @@ impl News {
         
         // Collect articles from all categories
         for category in ["Business", "Technology", "Sports", "Politics", "Health", "Entertainment"] {
-            if let Some(values) = json.get(category) {
-                if let Some(array) = values.as_array() {
+            if let Some(values) = json.get(category)
+                && let Some(array) = values.as_array() {
                     let category_articles: Vec<NewsArticle> = array
                         .iter()
                         .take(10) // Take up to 10 from each category
@@ -138,7 +138,6 @@ impl News {
                         .collect();
                     articles.extend(category_articles);
                 }
-            }
         }
         
         // Limit to 50 articles total
@@ -182,8 +181,8 @@ impl Component for News {
                 }
                 KeyCode::Enter => {
                     let state = self.state.read().unwrap();
-                    if let Some(selected) = state.table_state.selected() {
-                        if let Some(article) = state.news_articles.get(selected) {
+                    if let Some(selected) = state.table_state.selected()
+                        && let Some(article) = state.news_articles.get(selected) {
                             let url = article.link.trim_matches('"');
                             info!("News: Opening URL: {}", url);
                             
@@ -192,7 +191,6 @@ impl Component for News {
                                 error!("News: Failed to open URL {}: {}", url, e);
                             }
                         }
-                    }
                 }
                 _ => {}
             },
@@ -266,7 +264,7 @@ impl Component for News {
             }
             LoadingStatus::Error(error) => {
                 let block = Block::default()
-                    .title(format!("News - Error: {}", error))
+                    .title(format!("News - Error: {error}"))
                     .borders(Borders::ALL)
                     .style(Style::default().fg(Color::Red));
                 frame.render_widget(block, area);
