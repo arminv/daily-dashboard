@@ -1,11 +1,11 @@
 [package]
 name = "daily-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "A TUI app for showing important info as a daily dashboard"
+description = "A TUI to show useful information throughout the day."
 authors = ["Armin Varshokar <arminvarshokar@gmail.com>"]
 build = "build.rs"
-repository = "https://github.com/arminv/daily-dashboard-v2"
+repository = "https://github.com/arminv/daily-dashboard"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
