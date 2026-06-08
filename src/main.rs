@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use clap::Parser;
 use cli::Cli;
 use color_eyre::Result;
