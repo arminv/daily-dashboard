@@ -141,7 +141,10 @@ impl Greeting {
 
 impl Component for Greeting {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let greeting_message = String::from("👋 ") + &whoami::username().to_ascii_uppercase();
+        let greeting_message = String::from("👋 ")
+            + &whoami::username()
+                .unwrap_or("User".to_string())
+                .to_uppercase();
         let now = Local::now();
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();

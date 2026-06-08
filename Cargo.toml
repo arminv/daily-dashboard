@@ -1,11 +1,11 @@
 [package]
 name = "daily-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "A TUI app for showing important info as a daily dashboard"
+description = "A TUI to show useful information throughout the day."
 authors = ["Armin Varshokar <arminvarshokar@gmail.com>"]
 build = "build.rs"
-repository = "https://github.com/arminv/daily-dashboard-v2"
+repository = "https://github.com/arminv/daily-dashboard"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,34 +20,38 @@ clap = { version = "4.5.20", features = [
     "unstable-styles",
 ] }
 color-eyre = "0.6.3"
-config = "0.14.0"
-crossterm = { version = "0.28.1", features = ["serde", "event-stream"] }
+config = "0.15.23"
+crossterm = { version = "0.29.0", features = ["serde", "event-stream"] }
 derive_deref = "1.1.1"
-directories = "5.0.1"
+directories = "6.0.0"
 futures = "0.3.31"
 human-panic = "2.0.2"
-json5 = "0.4.1"
+json5 = "1.3.1"
 lazy_static = "1.5.0"
 libc = "0.2.161"
 pretty_assertions = "1.4.1"
-ratatui = { version = "0.29.0", features = ["serde", "macros", "widget-calendar"] }
+ratatui = { version = "0.30.1", features = [
+    "serde",
+    "macros",
+    "widget-calendar",
+] }
 serde = { version = "1.0.211", features = ["derive"] }
 serde_json = "1.0"
-signal-hook = "0.3.17"
+signal-hook = "0.4.4"
 strip-ansi-escapes = "0.2.0"
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13.4", features = ["json"] }
 ipgeolocate = "0.3"
 tokio-util = "0.7.12"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "serde"] }
-whoami = "1.6.0"
+whoami = "2.1.2"
 chrono = "0.4"
 time = "0.3.41"
 open = "5.0"
 
 [build-dependencies]
 anyhow = "1.0.90"
-vergen-gix = { version = "1.0.2", features = ["build", "cargo"] }
+vergen-gix = { version = "9.1.0", features = ["build", "cargo"] }

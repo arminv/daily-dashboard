@@ -355,7 +355,7 @@ impl Component for News {
                 // Position news widget in the right portion of the screen, below weather
                 let news_area = Rect {
                     x: area.x + 2,
-                    y: area.y + 23,
+                    y: area.y + 22,
                     width: area.width.saturating_sub(4),
                     height: area.height.saturating_sub(15),
                 };
