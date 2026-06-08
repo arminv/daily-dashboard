@@ -355,9 +355,9 @@ impl Component for News {
                 // Position news widget in the right portion of the screen, below weather
                 let news_area = Rect {
                     x: area.x + 2,
-                    y: area.y + 13, // Position below weather forecast (4 + 8 + 1 spacing)
+                    y: area.y + 23,
                     width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(15), // Leave space for other components
+                    height: area.height.saturating_sub(15),
                 };
 
                 let table = Table::new(
@@ -375,7 +375,7 @@ impl Component for News {
                         .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White)),
                 )
-                .row_highlight_style(Style::default().bg(Color::DarkGray))
+                .row_highlight_style(Style::default().bg(Color::Blue))
                 .highlight_symbol("> ");
 
                 // We need to work with the actual table state, not a clone
