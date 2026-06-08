@@ -160,14 +160,12 @@ impl Weather {
             && let Some(value) = temp.as_f64()
         {
             weather_state.temperature = value as f32;
-            info!("Weather: Temperature: {}", value);
         }
 
         if let Some(wind) = current.get("wind_speed_10m")
             && let Some(value) = wind.as_f64()
         {
             weather_state.wind = format!("{value:.1} km/h");
-            info!("Weather: Wind: {value:?}");
         }
 
         if let Some(code) = current.get("weather_code")
@@ -176,7 +174,6 @@ impl Weather {
             let code_value = value as u32;
             weather_state.description = self.get_weather_description(code_value);
             weather_state.icon = self.get_weather_icon(code_value);
-            info!("Weather: Code {}: {}", value, weather_state.description);
         }
 
         // Extract daily forecast data
@@ -202,25 +199,19 @@ impl Weather {
             }
 
             if let Some(max_temps) = temp_max_array.and_then(|a| a.as_array()) {
-                weather_state
-                    .daily_high_temperatures
-                    .extend(max_temps.iter().filter_map(|v| {
-                        v.as_f64().map(|temp| {
-                            info!("Weather: Daily max temp: {}", temp);
-                            temp as f32
-                        })
-                    }));
+                weather_state.daily_high_temperatures.extend(
+                    max_temps
+                        .iter()
+                        .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+                );
             }
 
             if let Some(min_temps) = temp_min_array.and_then(|a| a.as_array()) {
-                weather_state
-                    .daily_low_temperatures
-                    .extend(min_temps.iter().filter_map(|v| {
-                        v.as_f64().map(|temp| {
-                            info!("Weather: Daily min temp: {}", temp);
-                            temp as f32
-                        })
-                    }));
+                weather_state.daily_low_temperatures.extend(
+                    min_temps
+                        .iter()
+                        .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+                );
             }
         }
 

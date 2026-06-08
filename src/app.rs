@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::components::calendar::Calendar;
+use crate::components::news::News;
 use crate::components::weather::Weather;
 use crate::{
     action::Action,
@@ -47,8 +48,8 @@ impl App {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let greeting = Greeting::new();
         let greeting_state = greeting.state.clone();
-        // Create a weather component with access to greeting's state
         let weather = Weather::new(greeting_state);
+        let news = News::new();
 
         Ok(Self {
             tick_rate,
@@ -57,6 +58,7 @@ impl App {
                 Box::new(greeting),
                 Box::new(weather),
                 Box::new(Calendar::default()),
+                Box::new(news),
                 // Box::new(FpsCounter::default()),
             ],
             should_quit: false,

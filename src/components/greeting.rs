@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Paragraph},
 };
 use std::sync::{Arc, RwLock};
 use tracing::{error, info};
@@ -154,10 +154,7 @@ impl Component for Greeting {
             height: area.height.saturating_sub(1),
         };
         // Create border widget with date as title
-        let border_widget = Block::default()
-            .title(datetime_str)
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::LightCyan));
+        let border_widget = Block::default().title(datetime_str);
         // Define areas for content inside the border
         let greeting_area = Rect {
             x: area.x + 2, // Adjusted for border
