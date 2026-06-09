@@ -10,6 +10,10 @@ use ratatui::widgets::TableState;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info};
 
+const MAX_NUMBER_OF_ARTICLES: usize = 50;
+const FETCH_INTERVAL_MINS: i64 = 30;
+const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
+
 #[derive(Clone, Debug)]
 pub struct NewsArticle {
     pub title: String,
@@ -44,7 +48,7 @@ impl News {
 
     async fn fetch_news_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
-        let api_url = "https://ok.surf/api/v1/cors/news-feed".to_string();
+        let api_url = NEW_API_URL.to_string();
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
             Err(e) => {
@@ -62,7 +66,6 @@ impl News {
             return;
         }
 
-        // Get the response text
         let body_text = match response.text().await {
             Ok(text) => text,
             Err(e) => {
@@ -84,19 +87,8 @@ impl News {
             }
         };
 
-        // Debug: Log first article structure to understand date format
-        if let Some(first_article) = json
-            .get("Business")
-            .and_then(|b| b.as_array())
-            .and_then(|arr| arr.first())
-        {
-            info!("News: First article structure: {:?}", first_article);
-        }
-
         // Extract all available articles from different categories
         let mut articles: Vec<NewsArticle> = Vec::new();
-
-        // Collect articles from all categories
         for category in [
             "Business",
             "Technology",
@@ -136,8 +128,7 @@ impl News {
             }
         }
 
-        // Limit to 50 articles total
-        articles.truncate(50);
+        articles.truncate(MAX_NUMBER_OF_ARTICLES);
 
         if articles.is_empty() {
             let error_msg = "No articles found in response".to_string();
@@ -208,22 +199,17 @@ impl Component for News {
         if action == Action::Tick {
             let should_fetch = {
                 let news_state = self.state.read().unwrap();
-
-                // Check if news needs initial loading or had an error
                 let is_initial_load = matches!(
                     news_state.loading_status,
                     LoadingStatus::NotStarted | LoadingStatus::Error(_)
                 );
-
-                // Check if 30 minutes have passed since the last update
                 let now = Local::now();
                 let should_refresh = match news_state.last_updated_at {
                     Some(last_updated) => {
                         let duration = now.signed_duration_since(last_updated);
-                        // Refresh if more than 30 minutes have passed
-                        duration.num_minutes() >= 30
+                        duration.num_minutes() >= FETCH_INTERVAL_MINS
                     }
-                    None => true, // No previous update, so fetch
+                    None => true,
                 };
 
                 is_initial_load || should_refresh
@@ -309,7 +295,6 @@ impl Component for News {
                     })
                     .collect();
 
-                // Position news widget in the right portion of the screen, below weather
                 let news_area = Rect {
                     x: area.x + 2,
                     y: area.y + 22,
@@ -333,7 +318,6 @@ impl Component for News {
                 .row_highlight_style(Style::default().bg(Color::Blue))
                 .highlight_symbol("> ");
 
-                // We need to work with the actual table state, not a clone
                 drop(news_state); // Release the read lock
                 let mut state_write = self.state.write().unwrap();
                 frame.render_stateful_widget(table, news_area, &mut state_write.table_state);

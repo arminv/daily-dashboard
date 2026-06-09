@@ -47,7 +47,7 @@ impl Greeting {
     }
 
     fn run(&self) {
-        let this = self.clone(); // clone the widget to pass to the background task
+        let this = self.clone();
         tokio::spawn(async move {
             this.fetch_location_data().await;
         });
@@ -117,7 +117,7 @@ impl Greeting {
                         return Ok(ip.trim().to_string());
                     }
                 }
-                Err(_) => continue, // Try the next API if this one fails
+                Err(_) => continue,
             }
         }
 
@@ -149,16 +149,13 @@ impl Component for Greeting {
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
-        // Define area for the bordered content
         let border_area = Rect {
             x: area.x,
             y: area.y,
             width: area.width,
             height: area.height.saturating_sub(1),
         };
-        // Create border widget with date as title
         let border_widget = Block::default().title(datetime_str);
-        // Define areas for content inside the border
         let greeting_area = Rect {
             x: area.x + 2, // Adjusted for border
             y: area.y + 2, // Adjusted for border and title
@@ -172,7 +169,6 @@ impl Component for Greeting {
             height: 1,
         };
 
-        // Create content widgets
         let greeting_widget = Paragraph::new(greeting_message).style(
             Style::default()
                 .add_modifier(Modifier::BOLD)

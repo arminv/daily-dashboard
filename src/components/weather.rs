@@ -28,7 +28,7 @@ pub struct Weather {
     greeting_state: Arc<RwLock<super::greeting::GreetingState>>,
 }
 
-const REFETCH_WEATHER_IN_MINUTES: i64 = 10;
+const REFETCH_WEATHER_IN_MINS: i64 = 10;
 
 impl Weather {
     pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {
@@ -77,7 +77,6 @@ impl Weather {
     async fn fetch_weather_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
 
-        // Check if location data is ready
         let location_data = {
             let greeting_state = self.greeting_state.read().unwrap();
 
@@ -120,7 +119,6 @@ impl Weather {
             return;
         }
 
-        // Get the response text
         let body_text = match response.text().await {
             Ok(text) => text,
             Err(e) => {
@@ -131,7 +129,6 @@ impl Weather {
             }
         };
 
-        // Parse the JSON
         let json: serde_json::Value = match serde_json::from_str(&body_text) {
             Ok(json) => json,
             Err(e) => {
@@ -142,7 +139,6 @@ impl Weather {
             }
         };
 
-        // Extract the weather data
         let current = match json.get("current") {
             Some(current) => current,
             None => {
@@ -176,9 +172,7 @@ impl Weather {
             weather_state.icon = self.get_weather_icon(code_value);
         }
 
-        // Extract daily forecast data
         if let Some(daily) = json.get("daily") {
-            // Clear existing data to avoid accumulation
             weather_state.daily_weekdays.clear();
             weather_state.daily_high_temperatures.clear();
             weather_state.daily_low_temperatures.clear();
@@ -257,25 +251,23 @@ impl Component for Weather {
                 let weather_state = self.state.read().unwrap();
                 let greeting_state = self.greeting_state.read().unwrap();
 
-                // Check if the location is loaded
                 let is_location_ready =
                     matches!(greeting_state.loading_status, LoadingStatus::Loaded);
 
-                // Check if weather needs initial loading or had an error
                 let is_initial_load = matches!(
                     weather_state.loading_status,
                     LoadingStatus::NotStarted | LoadingStatus::Error(_)
                 );
 
-                // Check if 5 minutes have passed since the last update
+                // Check if N minutes have passed since the last update
                 let now = Local::now();
                 let should_refresh = match weather_state.last_updated_at {
                     Some(last_updated) => {
                         let duration = now.signed_duration_since(last_updated);
-                        // Refresh if more than n minutes have passed
-                        duration.num_minutes() >= REFETCH_WEATHER_IN_MINUTES
+                        // Refresh if more than N minutes have passed
+                        duration.num_minutes() >= REFETCH_WEATHER_IN_MINS
                     }
-                    None => true, // No previous update, so fetch
+                    None => true,
                 };
 
                 is_location_ready && (is_initial_load || should_refresh)
@@ -296,7 +288,7 @@ impl Component for Weather {
         let weather_str = self.get_weather_display();
         let weather_area = Rect {
             x: area.x + 2,
-            y: area.y + 4, // Position below location
+            y: area.y + 4,
             width: area.width.saturating_sub(2),
             height: 1,
         };
@@ -313,7 +305,7 @@ impl Component for Weather {
             .split(area);
         let main_area = layout[2];
         let padded_chart_area = Rect {
-            x: main_area.x + 2, // Add left padding
+            x: main_area.x + 2,
             y: main_area.y + 2,
             width: main_area.width.saturating_sub(4),
             ..main_area
