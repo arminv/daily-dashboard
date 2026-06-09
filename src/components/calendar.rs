@@ -1,4 +1,3 @@
-use crate::action::Action;
 use crate::components::Component;
 use color_eyre::Result;
 use ratatui::widgets::Block;
@@ -26,10 +25,6 @@ impl Calendar {
 }
 
 impl Component for Calendar {
-    fn update(&mut self, _action: Action) -> Result<Option<Action>> {
-        Ok(None)
-    }
-
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let bordered_area = Rect {
             x: area.x + 2,
@@ -57,8 +52,6 @@ impl Component for Calendar {
             .unwrap_or(OffsetDateTime::now_utc())
             .date();
         let monthly = Monthly::new(date, CalendarEventStore::today(Style::new().red().bold()))
-            // .block(Block::new().padding(Padding::new(0, 0, 2, 0)))
-            // .show_month_header(Style::new().bold().fg(Color::Red))
             .show_weekdays_header(Style::new().italic().fg(Color::Red));
 
         frame.render_widget(monthly, calendar_area);

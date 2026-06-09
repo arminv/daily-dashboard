@@ -6,7 +6,7 @@ use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::widgets::{Row, TableState};
+use ratatui::widgets::TableState;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info};
 
@@ -15,7 +15,6 @@ pub struct NewsArticle {
     pub title: String,
     pub link: String,
     pub source: String,
-    pub date: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -130,43 +129,6 @@ impl News {
                                 .as_str()?
                                 .trim_matches('"')
                                 .to_string(),
-                            date: {
-                                // Try different possible date field names
-                                let date_str = article_object
-                                    .get("date")
-                                    .or_else(|| article_object.get("published"))
-                                    .or_else(|| article_object.get("publishedAt"))
-                                    .or_else(|| article_object.get("pub_date"))
-                                    .or_else(|| article_object.get("time"))
-                                    .and_then(|d| d.as_str())
-                                    .map(|s| s.trim_matches('"'))
-                                    .unwrap_or("No date");
-
-                                // Try to parse and format the date
-                                if let Ok(parsed_date) =
-                                    chrono::DateTime::parse_from_rfc3339(date_str)
-                                {
-                                    parsed_date.format("%m/%d %H:%M").to_string()
-                                } else if let Ok(parsed_date) =
-                                    chrono::DateTime::parse_from_rfc2822(date_str)
-                                {
-                                    parsed_date.format("%m/%d %H:%M").to_string()
-                                } else if let Ok(parsed_date) =
-                                    chrono::NaiveDateTime::parse_from_str(
-                                        date_str,
-                                        "%Y-%m-%d %H:%M:%S",
-                                    )
-                                {
-                                    parsed_date.format("%m/%d %H:%M").to_string()
-                                } else {
-                                    // If parsing fails, show the raw string or "No date"
-                                    if date_str != "No date" && !date_str.is_empty() {
-                                        date_str.to_string()
-                                    } else {
-                                        "No date".to_string()
-                                    }
-                                }
-                            },
                         })
                     })
                     .collect();
@@ -331,10 +293,6 @@ impl Component for News {
                         "Source",
                         Style::default().add_modifier(Modifier::BOLD),
                     )),
-                    Cell::from(Span::styled(
-                        "Date",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    )),
                 ])
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
@@ -346,7 +304,6 @@ impl Component for News {
                         Row::new(vec![
                             Cell::from(article.title.clone()),
                             Cell::from(article.source.clone()),
-                            Cell::from(article.date.clone()),
                         ])
                         .height(1)
                     })
@@ -363,8 +320,7 @@ impl Component for News {
                 let table = Table::new(
                     rows,
                     [
-                        ratatui::layout::Constraint::Percentage(60),
-                        ratatui::layout::Constraint::Percentage(25),
+                        ratatui::layout::Constraint::Percentage(85),
                         ratatui::layout::Constraint::Percentage(15),
                     ],
                 )
@@ -386,12 +342,5 @@ impl Component for News {
         }
 
         Ok(())
-    }
-}
-
-impl From<&NewsArticle> for Row<'_> {
-    fn from(article: &NewsArticle) -> Self {
-        let article = article.clone();
-        Row::new(vec![article.title, article.source, article.date])
     }
 }
