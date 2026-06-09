@@ -328,7 +328,6 @@ impl Component for News {
                 .block(
                     Block::default()
                         .title(title)
-                        .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White)),
                 )
                 .row_highlight_style(Style::default().bg(Color::Blue))
