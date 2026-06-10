@@ -315,7 +315,7 @@ impl Component for News {
                     [
                         ratatui::layout::Constraint::Percentage(80),
                         ratatui::layout::Constraint::Percentage(10),
-                        ratatui::layout::Constraint::Percentage(5),
+                        ratatui::layout::Constraint::Percentage(10),
                     ],
                 )
                 .header(header)
