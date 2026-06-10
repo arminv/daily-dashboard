@@ -150,21 +150,21 @@ impl Component for Greeting {
         let location_str = self.get_location_display();
 
         let border_area = Rect {
-            x: area.x,
-            y: area.y,
+            x: area.x + 2,
+            y: area.y + 1,
             width: area.width,
             height: area.height.saturating_sub(1),
         };
         let border_widget = Block::default().title(datetime_str);
         let greeting_area = Rect {
             x: area.x + 2, // Adjusted for border
-            y: area.y + 2, // Adjusted for border and title
+            y: area.y + 3, // Adjusted for border and title
             width: area.width.min(30),
             height: 2,
         };
         let location_area = Rect {
             x: area.x + 2,             // Adjusted for border
-            y: area.y + 3,             // Position below the greeting
+            y: area.y + 4,             // Position below the greeting
             width: area.width.min(30), // Account for the border on both sides
             height: 1,
         };

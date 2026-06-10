@@ -291,7 +291,7 @@ impl Component for Weather {
         let weather_str = self.get_weather_display();
         let weather_area = Rect {
             x: area.x,
-            y: area.y,
+            y: area.y + 1,
             width: area.width,
             height: area.height,
         };
@@ -310,7 +310,7 @@ impl Component for Weather {
         let padded_chart_area = Rect {
             x: main_area.x,
             y: main_area.y,
-            width: main_area.width,
+            width: main_area.width.saturating_sub(2),
             height: main_area.height,
         };
 
