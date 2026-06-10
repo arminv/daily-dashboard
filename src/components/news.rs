@@ -10,15 +10,17 @@ use ratatui::widgets::TableState;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info};
 
+const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
+const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 10;
 const MAX_NUMBER_OF_ARTICLES: usize = 50;
 const FETCH_INTERVAL_MINS: i64 = 30;
-const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
 
 #[derive(Clone, Debug)]
 pub struct NewsArticle {
     pub title: String,
     pub link: String,
     pub source: String,
+    pub category: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -102,7 +104,7 @@ impl News {
             {
                 let category_articles: Vec<NewsArticle> = array
                     .iter()
-                    .take(10) // Take up to 10 from each category
+                    .take(MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY)
                     .filter_map(|article| {
                         let article_object = article.as_object()?;
                         Some(NewsArticle {
@@ -121,6 +123,7 @@ impl News {
                                 .as_str()?
                                 .trim_matches('"')
                                 .to_string(),
+                            category: category.to_string(),
                         })
                     })
                     .collect();
@@ -279,6 +282,10 @@ impl Component for News {
                         "Source",
                         Style::default().add_modifier(Modifier::BOLD),
                     )),
+                    Cell::from(Span::styled(
+                        "Category",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    )),
                 ])
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
@@ -290,6 +297,7 @@ impl Component for News {
                         Row::new(vec![
                             Cell::from(article.title.clone()),
                             Cell::from(article.source.clone()),
+                            Cell::from(article.category.clone()),
                         ])
                         .height(1)
                     })
@@ -305,8 +313,9 @@ impl Component for News {
                 let table = Table::new(
                     rows,
                     [
-                        ratatui::layout::Constraint::Percentage(85),
-                        ratatui::layout::Constraint::Percentage(15),
+                        ratatui::layout::Constraint::Percentage(80),
+                        ratatui::layout::Constraint::Percentage(10),
+                        ratatui::layout::Constraint::Percentage(5),
                     ],
                 )
                 .header(header)

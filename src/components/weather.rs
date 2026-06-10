@@ -1,4 +1,5 @@
 use super::Component;
+use super::greeting::GreetingState;
 use crate::action::Action;
 use crate::app::LoadingStatus;
 use chrono::{Datelike, Local, NaiveDate};
@@ -25,13 +26,13 @@ pub struct WeatherState {
 #[derive(Clone, Debug)]
 pub struct Weather {
     state: Arc<RwLock<WeatherState>>,
-    greeting_state: Arc<RwLock<super::greeting::GreetingState>>,
+    greeting_state: Arc<RwLock<GreetingState>>,
 }
 
 const REFETCH_WEATHER_IN_MINS: i64 = 10;
 
 impl Weather {
-    pub fn new(greeting_state: Arc<RwLock<super::greeting::GreetingState>>) -> Self {
+    pub fn new(greeting_state: Arc<RwLock<GreetingState>>) -> Self {
         Self {
             state: Arc::new(RwLock::new(WeatherState::default())),
             greeting_state,
