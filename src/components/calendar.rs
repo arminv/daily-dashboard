@@ -1,10 +1,9 @@
 use crate::components::Component;
 use color_eyre::Result;
-use ratatui::widgets::Block;
 use ratatui::{
     Frame,
     layout::Rect,
-    prelude::{Color, Style, Stylize},
+    prelude::{Color, Style},
     widgets::calendar::{CalendarEventStore, Monthly},
 };
 use time::OffsetDateTime;
@@ -26,25 +25,9 @@ impl Calendar {
 
 impl Component for Calendar {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let bordered_area = Rect {
-            x: area.x + 2,
-            y: area.y + 14,
-            width: area.width.saturating_sub(4),
-            height: 8,
-        };
-        let today = OffsetDateTime::now_local()
-            .unwrap_or(OffsetDateTime::now_utc())
-            .date()
-            .to_string()
-            .bold()
-            .into_centered_line();
-        let bordered_block = Block::bordered().title(today);
-
-        frame.render_widget(bordered_block, bordered_area);
-
         let calendar_area = Rect {
             x: area.x + 3,
-            y: area.y + 15,
+            y: area.y + 6,
             width: 23,
             height: 5,
         };

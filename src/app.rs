@@ -5,12 +5,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
-use crate::components::calendar::Calendar;
-use crate::components::news::News;
-use crate::components::weather::Weather;
+use crate::dashboard::Dashboard;
 use crate::{
     action::Action,
-    components::{Component, greeting::Greeting},
+    components::Component,
     config::Config,
     tui::{Event, Tui},
 };
@@ -46,19 +44,13 @@ pub enum LoadingStatus {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let greeting = Greeting::new();
-        let greeting_state = greeting.state.clone();
-        let weather = Weather::new(greeting_state);
-        let news = News::new();
+        let dashboard = Dashboard::new();
 
         Ok(Self {
             tick_rate,
             frame_rate,
             components: vec![
-                Box::new(greeting),
-                Box::new(weather),
-                Box::new(Calendar::default()),
-                Box::new(news),
+                Box::new(dashboard),
                 // Box::new(FpsCounter::default()),
             ],
             should_quit: false,

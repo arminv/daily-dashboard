@@ -26,7 +26,7 @@ pub struct GreetingState {
     pub loading_status: LoadingStatus,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Greeting {
     pub state: Arc<RwLock<GreetingState>>,
 }

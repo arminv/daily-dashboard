@@ -1,7 +1,7 @@
 use super::Component;
 use super::greeting::GreetingState;
-use crate::action::Action;
 use crate::app::LoadingStatus;
+use crate::{action::Action, components::greeting::Greeting};
 use chrono::{Datelike, Local, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
@@ -32,7 +32,9 @@ pub struct Weather {
 const REFETCH_WEATHER_IN_MINS: i64 = 10;
 
 impl Weather {
-    pub fn new(greeting_state: Arc<RwLock<GreetingState>>) -> Self {
+    pub fn new() -> Self {
+        let greeting = Greeting::new();
+        let greeting_state = greeting.state.clone();
         Self {
             state: Arc::new(RwLock::new(WeatherState::default())),
             greeting_state,
@@ -288,12 +290,12 @@ impl Component for Weather {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let weather_str = self.get_weather_display();
         let weather_area = Rect {
-            x: area.x + 2,
-            y: area.y + 4,
-            width: area.width.saturating_sub(2),
-            height: 1,
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
         };
-        let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Green));
+        let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Blue));
         frame.render_widget(weather_widget, weather_area);
 
         let layout = Layout::default()
@@ -306,10 +308,10 @@ impl Component for Weather {
             .split(area);
         let main_area = layout[2];
         let padded_chart_area = Rect {
-            x: main_area.x + 2,
-            y: main_area.y + 2,
-            width: main_area.width.saturating_sub(4),
-            ..main_area
+            x: main_area.x,
+            y: main_area.y,
+            width: main_area.width,
+            height: main_area.height,
         };
 
         let has_forecast_data = {

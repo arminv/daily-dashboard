@@ -12,6 +12,7 @@ mod config;
 mod errors;
 mod logging;
 mod tui;
+mod dashboard;
 
 #[tokio::main]
 async fn main() -> Result<()> {

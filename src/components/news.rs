@@ -305,7 +305,7 @@ impl Component for News {
 
                 let news_area = Rect {
                     x: area.x + 2,
-                    y: area.y + 22,
+                    y: area.y,
                     width: area.width.saturating_sub(4),
                     height: area.height.saturating_sub(15),
                 };
