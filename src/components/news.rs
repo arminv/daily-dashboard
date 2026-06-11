@@ -8,7 +8,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::TableState;
 use std::sync::{Arc, RwLock};
-use tracing::{error, info};
+use tracing::error;
 
 const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
 const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 10;
@@ -144,7 +144,6 @@ impl News {
         news_state.news_articles = articles;
         news_state.last_updated_at = Some(Local::now());
         news_state.loading_status = LoadingStatus::Loaded;
-        info!("News: Loaded news data");
     }
 }
 
@@ -158,10 +157,6 @@ impl Component for News {
                     if selected > 0 {
                         state.table_state.select(Some(selected - 1));
                     }
-                    info!(
-                        "News: Scrolling up to {}",
-                        state.table_state.selected().unwrap_or(0)
-                    );
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
                     let mut state = self.state.write().unwrap();
@@ -170,10 +165,6 @@ impl Component for News {
                     if selected < max_index {
                         state.table_state.select(Some(selected + 1));
                     }
-                    info!(
-                        "News: Scrolling down to {}",
-                        state.table_state.selected().unwrap_or(0)
-                    );
                 }
                 KeyCode::Enter => {
                     let state = self.state.read().unwrap();
@@ -181,7 +172,6 @@ impl Component for News {
                         && let Some(article) = state.news_articles.get(selected)
                     {
                         let url = article.link.trim_matches('"');
-                        info!("News: Opening URL: {}", url);
 
                         // Try to open the URL in the default browser
                         if let Err(e) = open::that(url) {
@@ -221,7 +211,6 @@ impl Component for News {
             if should_fetch {
                 let this = self.clone();
                 tokio::spawn(async move {
-                    info!("News: Fetching news data");
                     this.fetch_news_data().await;
                 });
             }
@@ -305,9 +294,9 @@ impl Component for News {
 
                 let news_area = Rect {
                     x: area.x + 2,
-                    y: area.y + 22,
+                    y: area.y + 2,
                     width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(15),
+                    height: area.height.saturating_sub(3),
                 };
 
                 let table = Table::new(
@@ -315,7 +304,7 @@ impl Component for News {
                     [
                         ratatui::layout::Constraint::Percentage(80),
                         ratatui::layout::Constraint::Percentage(10),
-                        ratatui::layout::Constraint::Percentage(5),
+                        ratatui::layout::Constraint::Percentage(10),
                     ],
                 )
                 .header(header)
