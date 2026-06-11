@@ -7,6 +7,11 @@ use crossterm::event::KeyCode;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::TableState;
+use ratatui::{
+    style::{Color, Modifier, Style},
+    text::Span,
+    widgets::{Block, Borders, Cell, Row, Table},
+};
 use std::sync::{Arc, RwLock};
 use tracing::error;
 
@@ -226,14 +231,7 @@ impl Component for News {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
-        use ratatui::{
-            style::{Color, Modifier, Style},
-            text::Span,
-            widgets::{Block, Borders, Cell, Row, Table},
-        };
-
         let news_state = self.state.read().unwrap();
-
         match &news_state.loading_status {
             LoadingStatus::NotStarted => {
                 let block = Block::default()
@@ -298,13 +296,6 @@ impl Component for News {
                     })
                     .collect();
 
-                let news_area = Rect {
-                    x: area.x + 2,
-                    y: area.y + 2,
-                    width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(3),
-                };
-
                 let table = Table::new(
                     rows,
                     [
@@ -322,12 +313,18 @@ impl Component for News {
                 .row_highlight_style(Style::default().bg(Color::Blue))
                 .highlight_symbol("> ");
 
+                let news_area = Rect {
+                    x: area.x + 2,
+                    y: area.y + 2,
+                    width: area.width.saturating_sub(4),
+                    height: area.height.saturating_sub(3),
+                };
+
                 drop(news_state); // Release the read lock
                 let mut state_write = self.state.write().unwrap();
                 frame.render_stateful_widget(table, news_area, &mut state_write.table_state);
             }
         }
-
         Ok(())
     }
 }
