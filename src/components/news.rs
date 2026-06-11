@@ -40,10 +40,12 @@ impl News {
     pub fn new() -> Self {
         let mut table_state: TableState = TableState::default();
         table_state.select(Some(0)); // Have the first article always selected
-        let mut init_state = NewsState::default();
-        init_state.table_state = table_state;
+
         Self {
-            state: Arc::new(RwLock::new(init_state)),
+            state: Arc::new(RwLock::new(NewsState {
+                table_state,
+                ..Default::default()
+            })),
         }
     }
 
