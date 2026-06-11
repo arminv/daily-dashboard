@@ -39,6 +39,7 @@ impl Dashboard {
 }
 
 impl Component for Dashboard {
+    // Since Dashboard is the only officially registered component, we need to pass along events, updates, etc. to child components
     fn handle_events(
         &mut self,
         event: Option<crate::tui::Event>,

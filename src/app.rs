@@ -3,7 +3,7 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::dashboard::Dashboard;
 use crate::{
@@ -130,7 +130,6 @@ impl App {
 
         match keymap.get(&vec![key]) {
             Some(action) => {
-                info!("Got action: {action:?}");
                 action_tx.send(action.clone())?;
             }
             _ => {
@@ -140,7 +139,6 @@ impl App {
 
                 // Check for multi-key combinations
                 if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                    info!("Got action: {action:?}");
                     action_tx.send(action.clone())?;
                 }
             }

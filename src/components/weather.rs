@@ -7,7 +7,7 @@ use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use serde_json;
 use std::sync::{Arc, RwLock};
-use tracing::{error, info};
+use tracing::error;
 
 #[derive(Clone, Debug, Default)]
 pub struct WeatherState {
@@ -84,10 +84,6 @@ impl Weather {
             let greeting_state = self.greeting_state.read().unwrap();
 
             if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
-                info!(
-                    "Weather: Location not loaded yet (status: {:?}), will retry later",
-                    greeting_state.loading_status
-                );
                 self.set_loading_state(LoadingStatus::NotStarted);
                 return;
             }
@@ -214,7 +210,6 @@ impl Weather {
 
         weather_state.loading_status = LoadingStatus::Loaded;
         weather_state.last_updated_at = Some(Local::now());
-        info!("Weather: Successfully loaded weather data");
     }
 
     fn get_weather_display(&self) -> String {
@@ -279,7 +274,6 @@ impl Component for Weather {
             if should_fetch {
                 let this = self.clone();
                 tokio::spawn(async move {
-                    info!("Weather: Fetching weather data");
                     this.fetch_weather_data().await;
                 });
             }
