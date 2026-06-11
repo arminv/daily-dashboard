@@ -11,8 +11,8 @@ use std::sync::{Arc, RwLock};
 use tracing::error;
 
 const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
-const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 10;
-const MAX_NUMBER_OF_ARTICLES: usize = 50;
+const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 30;
+const MAX_NUMBER_OF_ARTICLES: usize = 200;
 const FETCH_INTERVAL_MINS: i64 = 30;
 
 #[derive(Clone, Debug)]
