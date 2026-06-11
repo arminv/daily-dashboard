@@ -26,17 +26,9 @@ pub struct GreetingState {
     pub loading_status: LoadingStatus,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Greeting {
     pub state: Arc<RwLock<GreetingState>>,
-}
-
-impl Default for Greeting {
-    fn default() -> Self {
-        Self {
-            state: Arc::new(RwLock::new(GreetingState::default())),
-        }
-    }
 }
 
 impl Greeting {

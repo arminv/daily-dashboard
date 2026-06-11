@@ -8,14 +8,8 @@ use ratatui::{
 };
 use time::OffsetDateTime;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Calendar {}
-
-impl Default for Calendar {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Calendar {
     pub fn new() -> Self {

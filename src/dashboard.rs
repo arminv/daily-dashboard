@@ -16,12 +16,6 @@ pub struct Dashboard {
     news: News,
 }
 
-impl Default for Dashboard {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Dashboard {
     pub fn new() -> Self {
         let calendar = Calendar::new();
