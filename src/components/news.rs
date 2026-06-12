@@ -61,6 +61,7 @@ impl News {
 
     async fn fetch_news_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
+
         let api_url = NEW_API_URL.to_string();
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
@@ -321,8 +322,8 @@ impl Component for News {
                 };
 
                 drop(news_state); // Release the read lock
-                let mut state_write = self.state.write().unwrap();
-                frame.render_stateful_widget(table, news_area, &mut state_write.table_state);
+                let mut news_state_write = self.state.write().unwrap();
+                frame.render_stateful_widget(table, news_area, &mut news_state_write.table_state);
             }
         }
         Ok(())
