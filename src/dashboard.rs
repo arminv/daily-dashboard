@@ -1,37 +1,26 @@
-use crate::components::Component;
-use crate::components::calendar::Calendar;
-use crate::components::greeting::Greeting;
-use crate::components::inspiration::Inspiration;
-use crate::components::news::News;
-use crate::components::weather::Weather;
+use crate::components::{
+    Component, calendar::Calendar, greeting::Greeting, inspiration::Inspiration, news::News,
+    weather::Weather,
+};
 use color_eyre::Result;
 use color_eyre::eyre::Ok;
 use ratatui::layout::{Constraint, Direction, Flex, Layout};
 use ratatui::{Frame, layout::Rect};
 
-#[derive(Debug)]
 pub struct Dashboard {
-    calendar: Calendar,
-    greeting: Greeting,
-    inspiration: Inspiration,
-    weather: Weather,
-    news: News,
+    components: Vec<Box<dyn Component>>,
 }
 
 impl Dashboard {
     pub fn new() -> Self {
-        let calendar = Calendar::new();
-        let greeting = Greeting::new();
-        let inspiration = Inspiration::new();
-        let weather = Weather::new();
-        let news = News::new();
+        let calendar = Box::new(Calendar::new());
+        let greeting = Box::new(Greeting::new());
+        let weather = Box::new(Weather::new());
+        let inspiration = Box::new(Inspiration::new());
+        let news = Box::new(News::new());
 
         Self {
-            calendar,
-            greeting,
-            inspiration,
-            news,
-            weather,
+            components: vec![calendar, greeting, weather, inspiration, news],
         }
     }
 }
@@ -42,20 +31,22 @@ impl Component for Dashboard {
         &mut self,
         event: Option<crate::tui::Event>,
     ) -> Result<Option<crate::action::Action>> {
-        let _ = self.news.handle_events(event);
+        for component in &mut self.components {
+            let _ = component.handle_events(event.clone());
+        }
         Ok(None)
     }
 
     fn update(&mut self, action: crate::action::Action) -> Result<Option<crate::action::Action>> {
-        let _ = self.news.update(action.clone());
-        let _ = self.inspiration.update(action.clone());
-        let _ = self.weather.update(action);
+        for component in &mut self.components {
+            let _ = component.update(action.clone());
+        }
         let _ = action;
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let outer_layout_new = Layout::default()
+        let outer_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![Constraint::Min(10), Constraint::Percentage(85)])
             .flex(Flex::SpaceBetween)
@@ -70,14 +61,19 @@ impl Component for Dashboard {
             ])
             .flex(Flex::SpaceBetween)
             .spacing(1) // 1-cell gap between items
-            .split(outer_layout_new[0]);
+            .split(outer_layout[0]);
 
-        let _calendar_widget = self.calendar.draw(frame, inner_layout[0]);
-        let _greeting_widget = self.greeting.draw(frame, inner_layout[0]);
-        let _weather_widget = self.weather.draw(frame, inner_layout[1]);
-        let _inspiration_widget = self.inspiration.draw(frame, inner_layout[2]);
-        let _news_widget = self.news.draw(frame, outer_layout_new[1]);
-
+        for (idx, component) in self.components.iter_mut().enumerate() {
+            let target_layout = match idx {
+                0 => inner_layout[0],
+                1 => inner_layout[0],
+                2 => inner_layout[1],
+                3 => inner_layout[2],
+                4 => outer_layout[1],
+                _ => Rect::default(),
+            };
+            component.draw(frame, target_layout)?
+        }
         Ok(())
     }
 }
