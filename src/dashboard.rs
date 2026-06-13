@@ -6,7 +6,7 @@ use crate::components::news::News;
 use crate::components::weather::Weather;
 use color_eyre::Result;
 use color_eyre::eyre::Ok;
-use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::layout::{Constraint, Direction, Flex, Layout};
 use ratatui::{Frame, layout::Rect};
 
 #[derive(Debug)]
@@ -57,15 +57,19 @@ impl Component for Dashboard {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let outer_layout_new = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+            .constraints(vec![Constraint::Min(10), Constraint::Percentage(85)])
+            .flex(Flex::SpaceBetween)
+            .spacing(1)
             .split(area);
         let inner_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
-                Constraint::Percentage(25),
-                Constraint::Percentage(35),
-                Constraint::Percentage(40),
+                Constraint::Min(30),
+                Constraint::Min(30),
+                Constraint::Min(30),
             ])
+            .flex(Flex::SpaceBetween)
+            .spacing(1) // 1-cell gap between items
             .split(outer_layout_new[0]);
 
         let _calendar_widget = self.calendar.draw(frame, inner_layout[0]);
