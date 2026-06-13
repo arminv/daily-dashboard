@@ -18,10 +18,9 @@ impl Dashboard {
         let weather = Box::new(Weather::new());
         let inspiration = Box::new(Inspiration::new());
         let news = Box::new(News::new());
-
-        Self {
-            components: vec![calendar, greeting, weather, inspiration, news],
-        }
+        let components: Vec<Box<dyn Component>> =
+            vec![calendar, greeting, weather, inspiration, news];
+        Self { components }
     }
 }
 
