@@ -360,7 +360,6 @@ fn vertical_barchart(
         .collect();
 
     BarChart::default()
-        .block(Block::bordered().title("📈 7-Day Forecast (Low/High°)".bold().into_centered_line()))
         .value_style(Style::new().on_black().bold())
         .label_style(Style::new().fg(Color::Red))
         .bar_gap(1)
