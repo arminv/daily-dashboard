@@ -6,6 +6,7 @@ use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
 use ratatui::Frame;
 use ratatui::layout::Rect;
+use ratatui::text::Line;
 use ratatui::widgets::TableState;
 use ratatui::{
     style::{Color, Modifier, Style},
@@ -321,8 +322,8 @@ impl Component for News {
                 .header(header)
                 .block(
                     Block::default()
-                        .title(title)
-                        .style(Style::default().fg(Color::White)),
+                        .title(Line::from(title).centered().style(Style::default().dim()))
+                        .style(Style::default().fg(Color::Yellow)),
                 )
                 .row_highlight_style(Style::default().bg(Color::White))
                 .highlight_symbol("📌 ");
