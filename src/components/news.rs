@@ -157,6 +157,17 @@ impl News {
         news_state.last_updated_at = Some(Local::now());
         news_state.loading_status = LoadingStatus::Loaded;
     }
+
+    fn get_selected_row_fg_color(&self, idx: usize) -> Style {
+        let news_state = self.state.read().unwrap();
+        let mut selected_color = Style::default().fg(Color::White);
+        if let Some(selected_idx) = news_state.table_state.selected()
+            && selected_idx == idx
+        {
+            selected_color = Style::default().fg(Color::Black);
+        };
+        selected_color
+    }
 }
 
 impl Component for News {
@@ -287,12 +298,14 @@ impl Component for News {
                 let rows: Vec<Row> = news_state
                     .news_articles
                     .iter()
-                    .map(|article| {
+                    .enumerate()
+                    .map(|(idx, article)| {
                         Row::new(vec![
                             Cell::from(article.title.clone()),
                             Cell::from(article.source.clone()),
                             Cell::from(article.category.clone()),
                         ])
+                        .style(self.get_selected_row_fg_color(idx))
                         .height(1)
                     })
                     .collect();
