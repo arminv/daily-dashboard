@@ -324,8 +324,8 @@ impl Component for News {
                         .title(title)
                         .style(Style::default().fg(Color::White)),
                 )
-                .row_highlight_style(Style::default().bg(Color::Blue))
-                .highlight_symbol("> ");
+                .row_highlight_style(Style::default().bg(Color::White))
+                .highlight_symbol("📌 ");
 
                 let news_area = Rect {
                     x: area.x + 2,
