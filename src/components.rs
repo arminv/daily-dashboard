@@ -11,6 +11,7 @@ use crate::{action::Action, config::Config, tui::Event};
 pub mod calendar;
 pub mod fps;
 pub mod greeting;
+pub mod inspiration;
 pub mod news;
 pub mod weather;
 
