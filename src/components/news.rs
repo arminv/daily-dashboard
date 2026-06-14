@@ -16,6 +16,14 @@ const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
 const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 30;
 const MAX_NUMBER_OF_ARTICLES: usize = 200;
 const FETCH_INTERVAL_MINS: i64 = 30;
+const NEWS_CATEGORIES: [&str; 6] = [
+    "Business",
+    "Technology",
+    "Sports",
+    "Politics",
+    "Health",
+    "Entertainment",
+];
 
 #[derive(Clone, Debug)]
 pub struct NewsArticle {
@@ -100,14 +108,7 @@ impl News {
 
         // Extract all available articles from different categories
         let mut articles: Vec<NewsArticle> = Vec::new();
-        for category in [
-            "Business",
-            "Technology",
-            "Sports",
-            "Politics",
-            "Health",
-            "Entertainment",
-        ] {
+        for category in NEWS_CATEGORIES {
             if let Some(values) = json.get(category)
                 && let Some(array) = values.as_array()
             {
