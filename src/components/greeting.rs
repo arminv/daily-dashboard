@@ -11,6 +11,12 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use tracing::error;
 
+const IP_API_URLS: [&str; 3] = [
+    "https://api.ipify.org",
+    "https://ifconfig.me/ip",
+    "https://icanhazip.com",
+];
+
 #[derive(Debug, Clone, Default)]
 pub struct LocationState {
     pub city: String,
@@ -87,13 +93,7 @@ impl Greeting {
 
     async fn get_public_ip(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Try multiple IP API services in case one fails
-        let ip_apis = [
-            "https://api.ipify.org",
-            "https://ifconfig.me/ip",
-            "https://icanhazip.com",
-        ];
-
-        for api_url in ip_apis {
+        for api_url in IP_API_URLS {
             match reqwest::get(api_url).await {
                 Ok(response) => {
                     if let Ok(ip) = response.text().await
@@ -105,7 +105,6 @@ impl Greeting {
                 Err(_) => continue,
             }
         }
-
         Err("Failed to get public IP".into())
     }
 
@@ -134,23 +133,23 @@ impl Component for Greeting {
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
-        let border_area = Rect {
+        let title_line_area = Rect {
             x: area.x + 2,
             y: area.y + 1,
             width: area.width,
             height: area.height.saturating_sub(1),
         };
-        let border_widget = Block::default().title(datetime_str);
+        let title_line_widget = Block::default().title(datetime_str);
         let greeting_area = Rect {
-            x: area.x + 2, // Adjusted for border
-            y: area.y + 3, // Adjusted for border and title
+            x: area.x + 2,
+            y: area.y + 3,
             width: area.width.min(30),
             height: 2,
         };
         let location_area = Rect {
-            x: area.x + 2,             // Adjusted for border
-            y: area.y + 4,             // Position below the greeting
-            width: area.width.min(30), // Account for the border on both sides
+            x: area.x + 2,
+            y: area.y + 4,
+            width: area.width.min(30),
             height: 1,
         };
 
@@ -161,10 +160,9 @@ impl Component for Greeting {
         );
         let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Green));
 
-        frame.render_widget(border_widget, border_area);
+        frame.render_widget(title_line_widget, title_line_area);
         frame.render_widget(greeting_widget, greeting_area);
         frame.render_widget(location_widget, location_area);
-
         Ok(())
     }
 }

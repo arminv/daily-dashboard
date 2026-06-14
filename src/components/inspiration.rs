@@ -113,13 +113,11 @@ impl Component for Inspiration {
                 });
             }
         }
-
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let state = self.state.read().unwrap();
-
+        let inspiration_state_read = self.state.read().unwrap();
         let inspiration_area = Rect {
             x: area.x + 2,
             y: area.y + 1,
@@ -127,7 +125,7 @@ impl Component for Inspiration {
             height: area.height,
         };
 
-        match &state.loading_status {
+        match &inspiration_state_read.loading_status {
             LoadingStatus::NotStarted => {
                 let block = Block::default()
                     .title("Daily Inspiration")
@@ -150,7 +148,7 @@ impl Component for Inspiration {
                 let quote_line = Line::from(vec![
                     Span::styled("❝", Style::default().fg(Color::Cyan)),
                     Span::styled(
-                        state.quote_text.clone(),
+                        inspiration_state_read.quote_text.clone(),
                         Style::default()
                             .fg(Color::White)
                             .add_modifier(Modifier::BOLD),
@@ -161,7 +159,7 @@ impl Component for Inspiration {
                 let author_line = Line::from(vec![
                     Span::styled("— ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        state.quote_author.clone(),
+                        inspiration_state_read.quote_author.clone(),
                         Style::default()
                             .fg(Color::DarkGray)
                             .add_modifier(Modifier::ITALIC),
@@ -169,14 +167,13 @@ impl Component for Inspiration {
                 ]);
 
                 let paragraph = Paragraph::new(vec![quote_line, author_line])
-                    .style(Style::new().cyan())
                     .block(Block::default().title("Daily Inspiration"))
+                    .style(Style::new().cyan())
                     .wrap(Wrap { trim: true });
 
                 frame.render_widget(paragraph, inspiration_area);
             }
         }
-
         Ok(())
     }
 }

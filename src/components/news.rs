@@ -7,7 +7,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Row, Table, TableState},
+    widgets::{Block, Cell, Row, Table, TableState},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -95,7 +95,6 @@ impl News {
             }
         };
 
-        // Parse the JSON
         let json: serde_json::Value = match serde_json::from_str(&body_text) {
             Ok(json) => json,
             Err(e) => {
@@ -106,7 +105,6 @@ impl News {
             }
         };
 
-        // Extract all available articles from different categories
         let mut articles: Vec<NewsArticle> = Vec::new();
         for category in NEWS_CATEGORIES {
             if let Some(values) = json.get(category)
@@ -193,8 +191,6 @@ impl Component for News {
                         && let Some(article) = state.news_articles.get(selected)
                     {
                         let url = article.link.trim_matches('"');
-
-                        // Try to open the URL in the default browser
                         if let Err(e) = open::that(url) {
                             error!("News: Failed to open URL {}: {}", url, e);
                         }
@@ -205,7 +201,6 @@ impl Component for News {
             Some(Event::Mouse(_mouse_event)) => {}
             _ => (),
         };
-
         Ok(None)
     }
 
@@ -225,7 +220,6 @@ impl Component for News {
                     }
                     None => true,
                 };
-
                 is_initial_load || should_refresh
             };
 
@@ -236,43 +230,39 @@ impl Component for News {
                 });
             }
         }
-
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
-        let news_state = self.state.read().unwrap();
-        match &news_state.loading_status {
+        let news_state_read = self.state.read().unwrap();
+        match &news_state_read.loading_status {
             LoadingStatus::NotStarted => {
                 let block = Block::default()
                     .title("News")
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::White));
+                    .style(Style::default().fg(Color::Yellow));
                 frame.render_widget(block, area);
             }
             LoadingStatus::Loading => {
                 let block = Block::default()
                     .title("News - Loading...")
-                    .borders(Borders::ALL)
                     .style(Style::default().fg(Color::Yellow));
                 frame.render_widget(block, area);
             }
             LoadingStatus::Error(error) => {
                 let block = Block::default()
                     .title(format!("News - Error: {error}"))
-                    .borders(Borders::ALL)
                     .style(Style::default().fg(Color::Red));
                 frame.render_widget(block, area);
             }
             LoadingStatus::Loaded => {
-                let last_updated = news_state
+                let last_updated = news_state_read
                     .last_updated_at
                     .map(|dt| dt.format("%H:%M").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
 
                 let title = format!(
                     "News ({} articles) - Updated: {}",
-                    news_state.news_articles.len(),
+                    news_state_read.news_articles.len(),
                     last_updated
                 );
 
@@ -293,7 +283,7 @@ impl Component for News {
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
 
-                let rows: Vec<Row> = news_state
+                let rows: Vec<Row> = news_state_read
                     .news_articles
                     .iter()
                     .enumerate()
@@ -332,9 +322,9 @@ impl Component for News {
                     height: area.height.saturating_sub(3),
                 };
 
-                drop(news_state); // Release the read lock
-                let mut news_state_write = self.state.write().unwrap();
-                frame.render_stateful_widget(table, news_area, &mut news_state_write.table_state);
+                drop(news_state_read); // Release the read lock first
+                let mut table_state_write = self.state.write().unwrap().table_state;
+                frame.render_stateful_widget(table, news_area, &mut table_state_write);
             }
         }
         Ok(())

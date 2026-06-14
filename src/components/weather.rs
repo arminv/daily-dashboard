@@ -246,16 +246,12 @@ impl Component for Weather {
             let should_fetch = {
                 let weather_state = self.state.read().unwrap();
                 let greeting_state = self.greeting_state.read().unwrap();
-
                 let is_location_ready =
                     matches!(greeting_state.loading_status, LoadingStatus::Loaded);
-
                 let is_initial_load = matches!(
                     weather_state.loading_status,
                     LoadingStatus::NotStarted | LoadingStatus::Error(_)
                 );
-
-                // Check if N minutes have passed since the last update
                 let now = Local::now();
                 let should_refresh = match weather_state.last_updated_at {
                     Some(last_updated) => {
@@ -293,9 +289,9 @@ impl Component for Weather {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(4), // Space for upper content
-                Constraint::Length(0), // Chart title
-                Constraint::Length(8), // Chart main area
+                Constraint::Length(4),
+                Constraint::Length(0),
+                Constraint::Length(8),
             ])
             .split(area);
         let main_area = layout[2];
