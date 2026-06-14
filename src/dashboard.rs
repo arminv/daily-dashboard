@@ -2,10 +2,11 @@ use crate::components::{
     Component, calendar::Calendar, greeting::Greeting, inspiration::Inspiration, news::News,
     weather::Weather,
 };
-use color_eyre::Result;
-use color_eyre::eyre::Ok;
-use ratatui::layout::{Constraint, Direction, Flex, Layout};
-use ratatui::{Frame, layout::Rect};
+use color_eyre::{Result, eyre::Ok};
+use ratatui::{
+    Frame,
+    layout::{Constraint, Direction, Flex, Layout, Rect},
+};
 
 pub struct Dashboard {
     components: Vec<Box<dyn Component>>,

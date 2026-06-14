@@ -1,17 +1,13 @@
-use crate::app::LoadingStatus;
-use crate::components::Component;
-use crate::{action::Action, tui::Event};
+use crate::{action::Action, app::LoadingStatus, components::Component, tui::Event};
 use chrono::Local;
 use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use ratatui::text::Line;
-use ratatui::widgets::TableState;
 use ratatui::{
+    Frame,
+    layout::Rect,
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Block, Borders, Cell, Row, Table},
+    text::{Line, Span},
+    widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;

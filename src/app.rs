@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use crate::dashboard::Dashboard;
 use crate::{
     action::Action,
     components::Component,
     config::Config,
+    dashboard::Dashboard,
     tui::{Event, Tui},
 };
 

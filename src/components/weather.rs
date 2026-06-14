@@ -1,7 +1,5 @@
-use super::Component;
-use super::greeting::GreetingState;
-use crate::app::LoadingStatus;
-use crate::{action::Action, components::greeting::Greeting};
+use super::{Component, greeting::GreetingState};
+use crate::{action::Action, app::LoadingStatus, components::greeting::Greeting};
 use chrono::{Datelike, Local, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};

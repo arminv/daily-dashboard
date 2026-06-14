@@ -1,6 +1,5 @@
 use super::Component;
-use crate::action::Action;
-use crate::app::LoadingStatus;
+use crate::{action::Action, app::LoadingStatus};
 use color_eyre::Result;
 use ratatui::{
     Frame,
