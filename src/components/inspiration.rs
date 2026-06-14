@@ -76,18 +76,18 @@ impl Inspiration {
         let entry = json
             .as_array()
             .and_then(|arr| arr.first())
-            .ok_or_else(|| "Unexpected quote response format".to_string())?;
+            .ok_or("Unexpected quote response format")?;
 
         let quote_text = entry
             .get("q")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "Missing quote text".to_string())?
+            .ok_or("Missing quote text")?
             .to_string();
 
         let quote_author = entry
             .get("a")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "Missing quote author".to_string())?
+            .ok_or("Missing quote author")?
             .to_string();
 
         Ok((quote_text, quote_author))
