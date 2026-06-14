@@ -26,17 +26,9 @@ pub struct GreetingState {
     pub loading_status: LoadingStatus,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Greeting {
     pub state: Arc<RwLock<GreetingState>>,
-}
-
-impl Default for Greeting {
-    fn default() -> Self {
-        Self {
-            state: Arc::new(RwLock::new(GreetingState::default())),
-        }
-    }
 }
 
 impl Greeting {
@@ -167,8 +159,7 @@ impl Component for Greeting {
                 .add_modifier(Modifier::BOLD)
                 .fg(Color::White),
         );
-        let location_widget =
-            Paragraph::new(location_str).style(Style::default().fg(Color::DarkGray));
+        let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Green));
 
         frame.render_widget(border_widget, border_area);
         frame.render_widget(greeting_widget, greeting_area);

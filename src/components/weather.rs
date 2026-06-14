@@ -1,7 +1,5 @@
-use super::Component;
-use super::greeting::GreetingState;
-use crate::app::LoadingStatus;
-use crate::{action::Action, components::greeting::Greeting};
+use super::{Component, greeting::GreetingState};
+use crate::{action::Action, app::LoadingStatus, components::greeting::Greeting};
 use chrono::{Datelike, Local, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
@@ -360,7 +358,6 @@ fn vertical_barchart(
         .collect();
 
     BarChart::default()
-        .block(Block::bordered().title("📈 7-Day Forecast (Low/High°)".bold().into_centered_line()))
         .value_style(Style::new().on_black().bold())
         .label_style(Style::new().fg(Color::Red))
         .bar_gap(1)

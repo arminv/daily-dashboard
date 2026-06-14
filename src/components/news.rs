@@ -1,12 +1,14 @@
-use crate::app::LoadingStatus;
-use crate::components::Component;
-use crate::{action::Action, tui::Event};
+use crate::{action::Action, app::LoadingStatus, components::Component, tui::Event};
 use chrono::Local;
 use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use ratatui::widgets::TableState;
+use ratatui::{
+    Frame,
+    layout::Rect,
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Cell, Row, Table, TableState},
+};
 use std::sync::{Arc, RwLock};
 use tracing::error;
 
@@ -38,8 +40,14 @@ pub struct News {
 
 impl News {
     pub fn new() -> Self {
+        let mut table_state: TableState = TableState::default();
+        table_state.select(Some(0)); // Have the first article always selected
+
         Self {
-            state: Arc::new(RwLock::new(NewsState::default())),
+            state: Arc::new(RwLock::new(NewsState {
+                table_state,
+                ..Default::default()
+            })),
         }
     }
 
@@ -50,6 +58,7 @@ impl News {
 
     async fn fetch_news_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
+
         let api_url = NEW_API_URL.to_string();
         let response = match reqwest::get(&api_url).await {
             Ok(resp) => resp,
@@ -145,6 +154,17 @@ impl News {
         news_state.last_updated_at = Some(Local::now());
         news_state.loading_status = LoadingStatus::Loaded;
     }
+
+    fn get_selected_row_fg_color(&self, idx: usize) -> Style {
+        let news_state = self.state.read().unwrap();
+        let mut selected_color = Style::default().fg(Color::White);
+        if let Some(selected_idx) = news_state.table_state.selected()
+            && selected_idx == idx
+        {
+            selected_color = Style::default().fg(Color::Black);
+        };
+        selected_color
+    }
 }
 
 impl Component for News {
@@ -220,14 +240,7 @@ impl Component for News {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
-        use ratatui::{
-            style::{Color, Modifier, Style},
-            text::Span,
-            widgets::{Block, Borders, Cell, Row, Table},
-        };
-
         let news_state = self.state.read().unwrap();
-
         match &news_state.loading_status {
             LoadingStatus::NotStarted => {
                 let block = Block::default()
@@ -282,22 +295,17 @@ impl Component for News {
                 let rows: Vec<Row> = news_state
                     .news_articles
                     .iter()
-                    .map(|article| {
+                    .enumerate()
+                    .map(|(idx, article)| {
                         Row::new(vec![
                             Cell::from(article.title.clone()),
                             Cell::from(article.source.clone()),
                             Cell::from(article.category.clone()),
                         ])
+                        .style(self.get_selected_row_fg_color(idx))
                         .height(1)
                     })
                     .collect();
-
-                let news_area = Rect {
-                    x: area.x + 2,
-                    y: area.y + 2,
-                    width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(3),
-                };
 
                 let table = Table::new(
                     rows,
@@ -310,18 +318,24 @@ impl Component for News {
                 .header(header)
                 .block(
                     Block::default()
-                        .title(title)
-                        .style(Style::default().fg(Color::White)),
+                        .title(Line::from(title).centered().style(Style::default().dim()))
+                        .style(Style::default().fg(Color::Yellow)),
                 )
-                .row_highlight_style(Style::default().bg(Color::Blue))
-                .highlight_symbol("> ");
+                .row_highlight_style(Style::default().bg(Color::White))
+                .highlight_symbol("📌 ");
+
+                let news_area = Rect {
+                    x: area.x + 2,
+                    y: area.y + 2,
+                    width: area.width.saturating_sub(4),
+                    height: area.height.saturating_sub(3),
+                };
 
                 drop(news_state); // Release the read lock
-                let mut state_write = self.state.write().unwrap();
-                frame.render_stateful_widget(table, news_area, &mut state_write.table_state);
+                let mut news_state_write = self.state.write().unwrap();
+                frame.render_stateful_widget(table, news_area, &mut news_state_write.table_state);
             }
         }
-
         Ok(())
     }
 }

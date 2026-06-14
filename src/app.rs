@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use crate::dashboard::Dashboard;
 use crate::{
     action::Action,
     components::Component,
     config::Config,
+    dashboard::Dashboard,
     tui::{Event, Tui},
 };
 
@@ -45,7 +45,6 @@ impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
         let dashboard = Dashboard::new();
-
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -72,11 +71,7 @@ impl App {
 
         for component in self.components.iter_mut() {
             component.register_action_handler(self.action_tx.clone())?;
-        }
-        for component in self.components.iter_mut() {
             component.register_config_handler(self.config.clone())?;
-        }
-        for component in self.components.iter_mut() {
             component.init(tui.size()?)?;
         }
 
@@ -84,6 +79,7 @@ impl App {
         loop {
             self.handle_events(&mut tui).await?;
             self.handle_actions(&mut tui)?;
+
             if self.should_suspend {
                 tui.suspend()?;
                 action_tx.send(Action::Resume)?;
