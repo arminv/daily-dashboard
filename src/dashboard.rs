@@ -26,7 +26,7 @@ impl Dashboard {
 }
 
 impl Component for Dashboard {
-    // Since Dashboard is the only officially registered component, we need to pass along events, updates, etc. to child components
+    // Since Dashboard is the only officially registered/orchestrator component, we need to pass along events, updates, etc. to child components
     fn handle_events(
         &mut self,
         event: Option<crate::tui::Event>,
@@ -60,17 +60,17 @@ impl Component for Dashboard {
                 Constraint::Min(30),
             ])
             .flex(Flex::SpaceBetween)
-            .spacing(1) // 1-cell gap between items
+            .spacing(1)
             .split(outer_layout[0]);
 
         for (idx, component) in self.components.iter_mut().enumerate() {
             let target_layout = match idx {
-                0 => inner_layout[0],
-                1 => inner_layout[0],
-                2 => inner_layout[1],
-                3 => inner_layout[2],
-                4 => outer_layout[1],
-                _ => Rect::default(),
+                0 => inner_layout[0], // Calendar
+                1 => inner_layout[0], // Greeting
+                2 => inner_layout[1], // Weather
+                3 => inner_layout[2], // Inspiration
+                4 => outer_layout[1], // News
+                _ => Rect::default(), // N/A
             };
             component.draw(frame, target_layout)?
         }
