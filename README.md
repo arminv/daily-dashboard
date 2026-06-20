@@ -12,7 +12,3 @@ cargo run
 ## Demo
 
 ![Daily Dashboard Demo](Demo.png)
-
-```
-
-```
