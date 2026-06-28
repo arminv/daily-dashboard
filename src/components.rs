@@ -9,6 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{action::Action, config::Config, tui::Event};
 
 pub mod calendar;
+pub mod dictionary;
 pub mod fps;
 pub mod greeting;
 pub mod inspiration;

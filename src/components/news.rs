@@ -169,8 +169,9 @@ impl News {
 impl Component for News {
     fn handle_events(&mut self, event: Option<Event>) -> color_eyre::Result<Option<Action>> {
         match event {
-            Some(Event::Key(key_event)) => match key_event.code {
+            Some(Event::Key(key)) => match key.code {
                 KeyCode::Char('i') | KeyCode::Up => {
+                    // TODO: DRY by creating a function - `set_selected_row`:
                     let mut state = self.state.write().unwrap();
                     let selected = state.table_state.selected().unwrap_or(0);
                     if selected > 0 {
@@ -198,7 +199,6 @@ impl Component for News {
                 }
                 _ => {}
             },
-            Some(Event::Mouse(_mouse_event)) => {}
             _ => (),
         };
         Ok(None)
