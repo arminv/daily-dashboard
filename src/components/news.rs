@@ -168,8 +168,8 @@ impl News {
 
 impl Component for News {
     fn handle_events(&mut self, event: Option<Event>) -> color_eyre::Result<Option<Action>> {
-        match event {
-            Some(Event::Key(key)) => match key.code {
+        if let Some(Event::Key(key)) = event {
+            match key.code {
                 KeyCode::Char('i') | KeyCode::Up => {
                     // TODO: DRY by creating a function - `set_selected_row`:
                     let mut state = self.state.write().unwrap();
@@ -198,8 +198,7 @@ impl Component for News {
                     }
                 }
                 _ => {}
-            },
-            _ => (),
+            }
         };
         Ok(None)
     }

@@ -1,15 +1,14 @@
 use crate::{action::Action, components::Component, tui::Event};
 use color_eyre::eyre::ErrReport;
-use crossterm::event::{self, KeyCode};
+use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Style},
-    widgets::{Block, Paragraph},
 };
+use ratatui_textarea::TextArea;
 use std::sync::{Arc, RwLock};
 use tracing::info;
-use tui_input::{Input, backend::crossterm::EventHandler};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum InputMode {
@@ -25,8 +24,7 @@ pub struct DictionaryState {
     // search_word: String,
     // search_word_definition: String,
     // last_updated_at: Option<chrono::DateTime<Local>>,
-    /// Current value of the input box
-    input: Input,
+    input: TextArea<'static>,
     /// Current input mode
     input_mode: InputMode,
 }
@@ -38,9 +36,14 @@ pub struct Dictionary {
 
 impl Dictionary {
     pub fn new() -> Self {
+        let mut input = TextArea::default();
+        input.set_cursor_line_style(Style::default().blue());
+        input.set_cursor_style(Style::default().bg(Color::Red));
+        input.set_placeholder_text("Enter a valid float (e.g. 1.56)");
+
         Self {
             state: Arc::new(RwLock::new(DictionaryState {
-                input_mode: InputMode::Normal,
+                input,
                 ..Default::default()
             })),
         }
@@ -60,28 +63,10 @@ impl Dictionary {
         self.state.write().unwrap().input_mode = InputMode::Normal;
     }
 
-    // TODO:
     fn render_input(&self, frame: &mut Frame, area: Rect) {
-        // keep 2 for borders and 1 for cursor
-        let width = area.width;
         let state_read = self.state.read().unwrap();
-        let scroll = state_read.input.visual_scroll(width as usize);
-        let style = match state_read.input_mode {
-            InputMode::Normal => Style::default(),
-            InputMode::Editing => Color::Yellow.into(),
-        };
-        let input = Paragraph::new(state_read.input.value())
-            .style(style)
-            .scroll((0, scroll as u16))
-            .block(Block::bordered().title("Input"));
-        frame.render_widget(input, area);
-
-        if state_read.input_mode == InputMode::Editing {
-            // Ratatui hides the cursor unless it's explicitly set. Position the  cursor past the
-            // end of the input text and one line down from the border to the input line
-            let x = state_read.input.visual_cursor().max(scroll) - scroll + 1;
-            frame.set_cursor_position((area.x + x as u16, area.y + 1))
-        }
+        let input = state_read.input.clone();
+        frame.render_widget(&input, area);
     }
 }
 
@@ -89,27 +74,51 @@ impl Component for Dictionary {
     fn handle_events(&mut self, event: Option<Event>) -> color_eyre::Result<Option<Action>> {
         let input_mode = self.state.read().unwrap().input_mode;
         match input_mode {
-            InputMode::Normal => match event {
-                Some(Event::Key(key)) => match key.code {
-                    KeyCode::Esc => self.start_editing(),
-                    _ => (),
-                },
-                _ => (),
-            },
-            InputMode::Editing => match event {
-                Some(Event::Key(key)) => match key.code {
-                    KeyCode::Esc => self.stop_editing(),
-                    _ => {
-                        info!("key.code - C : {:?}", key.code);
-
-                        let mut state_write = self.state.write().unwrap();
-                        let event = event::read()?;
-                        state_write.input.handle_event(&event);
-                        info!("Value : {:?}", state_write.input.value());
+            InputMode::Normal => {
+                if let Some(Event::Key(key)) = event
+                    && key.code == KeyCode::Esc
+                {
+                    self.start_editing()
+                }
+            }
+            InputMode::Editing => {
+                // TODO: approach 1:
+                if let Some(Event::Key(key)) = event {
+                    match key.code {
+                        KeyCode::Esc => self.stop_editing(),
+                        _ => {
+                            let input = &mut self.state.write().unwrap().input;
+                            input.input(key);
+                            info!("input.lines: {:?}", input.lines());
+                        }
                     }
-                },
-                _ => (),
-            },
+                }
+
+                // TODO: approach 2:
+                // match crossterm::event::read()?.into() {
+                //     Input { key: Key::Esc, .. } => self.stop_editing(),
+                //     input => {
+                //         let mut input_val = self.state.read().unwrap().input.clone();
+                //         info!("input: {:?}", input);
+                //         input_val.input(input);
+                //     }
+                // }
+            }
+        }
+        Ok(None)
+    }
+
+    fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
+        if action == Action::Tick {
+            let mut input_state = self.state.write().unwrap();
+            let cursor_color = if input_state.input_mode == InputMode::Editing {
+                Color::Blue
+            } else {
+                Color::Red
+            };
+            input_state
+                .input
+                .set_cursor_style(Style::default().bg(cursor_color));
         }
         Ok(None)
     }
