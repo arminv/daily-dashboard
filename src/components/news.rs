@@ -1,18 +1,17 @@
-use crate::{action::Action, app::LoadingStatus, components::Component, tui::Event};
+use crate::{action::Action, app::LoadingStatus, components::Component, http, theme, tui::Event};
 use chrono::Local;
-use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Cell, Row, Table, TableState},
+    widgets::{Cell, Row, Table, TableState},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
 
-const NEW_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
+const NEWS_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
 const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 30;
 const MAX_NUMBER_OF_ARTICLES: usize = 200;
 const FETCH_INTERVAL_MINS: i64 = 30;
@@ -44,10 +43,11 @@ pub struct NewsState {
 #[derive(Clone, Debug)]
 pub struct News {
     state: Arc<RwLock<NewsState>>,
+    client: reqwest::Client,
 }
 
 impl News {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest::Client) -> Self {
         let mut table_state: TableState = TableState::default();
         table_state.select(Some(0)); // Have the first article always selected
 
@@ -56,6 +56,7 @@ impl News {
                 table_state,
                 ..Default::default()
             })),
+            client,
         }
     }
 
@@ -64,83 +65,32 @@ impl News {
         state.loading_status = status;
     }
 
+    fn move_selection(&self, delta: i32) {
+        let mut state = self.state.write().unwrap();
+        let len = state.news_articles.len();
+        if len == 0 {
+            return;
+        }
+        let current = state.table_state.selected().unwrap_or(0);
+        let max_index = len - 1;
+        let next = (current as i32 + delta).clamp(0, max_index as i32) as usize;
+        state.table_state.select(Some(next));
+    }
+
     async fn fetch_news_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
 
-        let api_url = NEW_API_URL.to_string();
-        let response = match reqwest::get(&api_url).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                let error_msg = format!("API request failed: {e:?}");
-                error!("News: {error_msg:?}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
-                return;
-            }
-        };
-
-        if !response.status().is_success() {
-            let error_msg = format!("API returned error status: {}", response.status());
-            error!("News: {}", error_msg);
-            self.set_loading_state(LoadingStatus::Error(error_msg));
-            return;
-        }
-
-        let body_text = match response.text().await {
-            Ok(text) => text,
-            Err(e) => {
-                let error_msg = format!("Failed to read response body: {e:?}",);
-                error!("News: {error_msg:?}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
-                return;
-            }
-        };
-
-        let json: serde_json::Value = match serde_json::from_str(&body_text) {
+        let json = match http::get_json(&self.client, NEWS_API_URL).await {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("Failed to parse JSON: {e:?}");
-                error!("News: {error_msg:?}");
+                let error_msg = format!("News: {e}");
+                error!("{error_msg}");
                 self.set_loading_state(LoadingStatus::Error(error_msg));
                 return;
             }
         };
 
-        let mut articles: Vec<NewsArticle> = Vec::new();
-        for category in NEWS_CATEGORIES {
-            if let Some(values) = json.get(category)
-                && let Some(array) = values.as_array()
-            {
-                let category_articles: Vec<NewsArticle> = array
-                    .iter()
-                    .take(MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY)
-                    .filter_map(|article| {
-                        let article_object = article.as_object()?;
-                        Some(NewsArticle {
-                            title: article_object
-                                .get("title")?
-                                .as_str()?
-                                .trim_matches('"')
-                                .to_string(),
-                            link: article_object
-                                .get("link")?
-                                .as_str()?
-                                .trim_matches('"')
-                                .to_string(),
-                            source: article_object
-                                .get("source")?
-                                .as_str()?
-                                .trim_matches('"')
-                                .to_string(),
-                            category: category.to_string(),
-                        })
-                    })
-                    .collect();
-                articles.extend(category_articles);
-            }
-        }
-
-        articles.truncate(MAX_NUMBER_OF_ARTICLES);
-
+        let articles = parse_articles(&json);
         if articles.is_empty() {
             let error_msg = "No articles found in response".to_string();
             error!("News: {}", error_msg);
@@ -166,25 +116,53 @@ impl News {
     }
 }
 
+/// Parse the ok.surf news-feed JSON into a flat list of articles, capped at
+/// [`MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY`] per category and
+/// [`MAX_NUMBER_OF_ARTICLES`] overall. Pure (no I/O) so it can be unit-tested.
+fn parse_articles(json: &serde_json::Value) -> Vec<NewsArticle> {
+    let mut articles: Vec<NewsArticle> = Vec::new();
+    for category in NEWS_CATEGORIES {
+        if let Some(values) = json.get(category)
+            && let Some(array) = values.as_array()
+        {
+            let category_articles: Vec<NewsArticle> = array
+                .iter()
+                .take(MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY)
+                .filter_map(|article| {
+                    let article_object = article.as_object()?;
+                    Some(NewsArticle {
+                        title: article_object
+                            .get("title")?
+                            .as_str()?
+                            .trim_matches('"')
+                            .to_string(),
+                        link: article_object
+                            .get("link")?
+                            .as_str()?
+                            .trim_matches('"')
+                            .to_string(),
+                        source: article_object
+                            .get("source")?
+                            .as_str()?
+                            .trim_matches('"')
+                            .to_string(),
+                        category: category.to_string(),
+                    })
+                })
+                .collect();
+            articles.extend(category_articles);
+        }
+    }
+    articles.truncate(MAX_NUMBER_OF_ARTICLES);
+    articles
+}
+
 impl Component for News {
     fn handle_events(&mut self, event: Option<Event>) -> color_eyre::Result<Option<Action>> {
-        match event {
-            Some(Event::Key(key_event)) => match key_event.code {
-                KeyCode::Char('i') | KeyCode::Up => {
-                    let mut state = self.state.write().unwrap();
-                    let selected = state.table_state.selected().unwrap_or(0);
-                    if selected > 0 {
-                        state.table_state.select(Some(selected - 1));
-                    }
-                }
-                KeyCode::Char('j') | KeyCode::Down => {
-                    let mut state = self.state.write().unwrap();
-                    let selected = state.table_state.selected().unwrap_or(0);
-                    let max_index = state.news_articles.len().saturating_sub(1);
-                    if selected < max_index {
-                        state.table_state.select(Some(selected + 1));
-                    }
-                }
+        if let Some(Event::Key(key)) = event {
+            match key.code {
+                KeyCode::Char('i') | KeyCode::Up => self.move_selection(-1),
+                KeyCode::Char('j') | KeyCode::Down => self.move_selection(1),
                 KeyCode::Enter => {
                     let state = self.state.read().unwrap();
                     if let Some(selected) = state.table_state.selected()
@@ -197,9 +175,7 @@ impl Component for News {
                     }
                 }
                 _ => {}
-            },
-            Some(Event::Mouse(_mouse_event)) => {}
-            _ => (),
+            }
         };
         Ok(None)
     }
@@ -233,26 +209,20 @@ impl Component for News {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
+    fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         let news_state_read = self.state.read().unwrap();
         match &news_state_read.loading_status {
             LoadingStatus::NotStarted => {
-                let block = Block::default()
-                    .title("News")
-                    .style(Style::default().fg(Color::Yellow));
-                frame.render_widget(block, area);
+                frame.render_widget(theme::panel_block("📰 News"), area);
             }
             LoadingStatus::Loading => {
-                let block = Block::default()
-                    .title("News - Loading...")
-                    .style(Style::default().fg(Color::Yellow));
-                frame.render_widget(block, area);
+                frame.render_widget(theme::panel_block("📰 News — Loading..."), area);
             }
             LoadingStatus::Error(error) => {
-                let block = Block::default()
-                    .title(format!("News - Error: {error}"))
-                    .style(Style::default().fg(Color::Red));
-                frame.render_widget(block, area);
+                frame.render_widget(
+                    theme::panel_block_colored(format!("📰 News — Error: {error}"), theme::ERROR),
+                    area,
+                );
             }
             LoadingStatus::Loaded => {
                 let last_updated = news_state_read
@@ -261,7 +231,7 @@ impl Component for News {
                     .unwrap_or_else(|| "Unknown".to_string());
 
                 let title = format!(
-                    "News ({} articles) - Updated: {}",
+                    "📰 News ({} articles) · Updated: {}",
                     news_state_read.news_articles.len(),
                     last_updated
                 );
@@ -307,26 +277,21 @@ impl Component for News {
                     ],
                 )
                 .header(header)
-                .block(
-                    Block::default()
-                        .title(Line::from(title).centered().style(Style::default().dim()))
-                        .style(Style::default().fg(Color::Yellow)),
-                )
+                .block(theme::panel_block(
+                    Line::from(title).centered().style(Style::default().dim()),
+                ))
                 .row_highlight_style(Style::default().bg(Color::White))
                 .highlight_symbol("📌 ");
 
-                let news_area = Rect {
-                    x: area.x + 2,
-                    y: area.y + 2,
-                    width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(3),
-                };
-
                 drop(news_state_read); // Release the read lock first
                 let mut table_state_write = self.state.write().unwrap().table_state;
-                frame.render_stateful_widget(table, news_area, &mut table_state_write);
+                frame.render_stateful_widget(table, area, &mut table_state_write);
             }
         }
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/news.rs"]
+mod tests;
