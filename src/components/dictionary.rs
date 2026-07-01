@@ -201,9 +201,6 @@ async fn fetch_word_definition(
             return;
         }
     };
-
-    // The API returns an array on success, or an object with a "title" field
-    // (e.g. "No Definitions Found") when the word is unknown.
     let entries_array = match json.as_array() {
         Some(array) if !array.is_empty() => array,
         _ => {
@@ -218,7 +215,6 @@ async fn fetch_word_definition(
     };
 
     let entries: Vec<DictionaryEntry> = entries_array.iter().filter_map(parse_entry).collect();
-
     if entries.is_empty() {
         let mut state = data.write().unwrap();
         state.loading_status = LoadingStatus::Error("No definitions found".to_string());
