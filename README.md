@@ -1,8 +1,8 @@
 # Daily Dashboard
 
-[CI](https://github.com/arminv/daily-dashboard/actions/workflows/ci.yml)
-[Built with ratatui](https://ratatui.rs)
-[License: MIT](LICENSE)
+[![CI](https://github.com/arminv/daily-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/arminv/daily-dashboard/actions/workflows/ci.yml)
+[![Built with ratatui](https://img.shields.io/badge/built%20with-ratatui-blue)](https://ratatui.rs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A terminal dashboard you can keep open all day - weather, news, a calendar, a
 daily quote, and a built-in dictionary, all in one `ratatui` screen.
