@@ -6,7 +6,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -118,31 +118,50 @@ impl Component for Inspiration {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let inspiration_state_read = self.state.read().unwrap();
-        let inspiration_area = Rect {
-            x: area.x + 2,
-            y: area.y + 1,
-            width: area.width,
-            height: area.height,
+
+        let block = |title: String, color: Color| {
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title)
+                .style(Style::default().fg(color))
         };
 
         match &inspiration_state_read.loading_status {
             LoadingStatus::NotStarted => {
-                let block = Block::default()
-                    .title("Daily Inspiration")
-                    .style(Style::default().fg(Color::Yellow));
-                frame.render_widget(block, inspiration_area);
+                let b = block("✨ Daily Inspiration".to_string(), Color::Cyan);
+                let inner = b.inner(area);
+                frame.render_widget(b, area);
+                frame.render_widget(
+                    Paragraph::new("Fetching today's quote...")
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true }),
+                    inner,
+                );
             }
             LoadingStatus::Loading => {
-                let block = Block::default()
-                    .title("Daily Inspiration - Loading...")
-                    .style(Style::default().fg(Color::Yellow));
-                frame.render_widget(block, inspiration_area);
+                let b = block(
+                    "✨ Daily Inspiration — Loading...".to_string(),
+                    Color::Yellow,
+                );
+                let inner = b.inner(area);
+                frame.render_widget(b, area);
+                frame.render_widget(
+                    Paragraph::new("Fetching today's quote...")
+                        .style(Style::default().fg(Color::DarkGray))
+                        .wrap(Wrap { trim: true }),
+                    inner,
+                );
             }
             LoadingStatus::Error(error) => {
-                let block = Block::default()
-                    .title(format!("Daily Inspiration - Error: {error}"))
-                    .style(Style::default().fg(Color::Red));
-                frame.render_widget(block, inspiration_area);
+                let b = block(format!("✨ Daily Inspiration — Error: {error}"), Color::Red);
+                let inner = b.inner(area);
+                frame.render_widget(b, area);
+                frame.render_widget(
+                    Paragraph::new(format!("Couldn't load today's quote: {error}"))
+                        .style(Style::default().fg(Color::LightRed))
+                        .wrap(Wrap { trim: true }),
+                    inner,
+                );
             }
             LoadingStatus::Loaded => {
                 let quote_line = Line::from(vec![
@@ -167,11 +186,11 @@ impl Component for Inspiration {
                 ]);
 
                 let paragraph = Paragraph::new(vec![quote_line, author_line])
-                    .block(Block::default().title("Daily Inspiration"))
+                    .block(block("✨ Daily Inspiration".to_string(), Color::Cyan))
                     .style(Style::new().cyan())
                     .wrap(Wrap { trim: true });
 
-                frame.render_widget(paragraph, inspiration_area);
+                frame.render_widget(paragraph, area);
             }
         }
         Ok(())

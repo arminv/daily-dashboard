@@ -7,7 +7,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Cell, Row, Table, TableState},
+    widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -237,19 +237,22 @@ impl Component for News {
         match &news_state_read.loading_status {
             LoadingStatus::NotStarted => {
                 let block = Block::default()
-                    .title("News")
-                    .style(Style::default().fg(Color::Yellow));
+                    .borders(Borders::ALL)
+                    .title("📰 News")
+                    .style(Style::default().fg(Color::Cyan));
                 frame.render_widget(block, area);
             }
             LoadingStatus::Loading => {
                 let block = Block::default()
-                    .title("News - Loading...")
-                    .style(Style::default().fg(Color::Yellow));
+                    .borders(Borders::ALL)
+                    .title("📰 News — Loading...")
+                    .style(Style::default().fg(Color::Cyan));
                 frame.render_widget(block, area);
             }
             LoadingStatus::Error(error) => {
                 let block = Block::default()
-                    .title(format!("News - Error: {error}"))
+                    .borders(Borders::ALL)
+                    .title(format!("📰 News — Error: {error}"))
                     .style(Style::default().fg(Color::Red));
                 frame.render_widget(block, area);
             }
@@ -260,7 +263,7 @@ impl Component for News {
                     .unwrap_or_else(|| "Unknown".to_string());
 
                 let title = format!(
-                    "News ({} articles) - Updated: {}",
+                    "📰 News ({} articles) · Updated: {}",
                     news_state_read.news_articles.len(),
                     last_updated
                 );
@@ -308,22 +311,16 @@ impl Component for News {
                 .header(header)
                 .block(
                     Block::default()
+                        .borders(Borders::ALL)
                         .title(Line::from(title).centered().style(Style::default().dim()))
-                        .style(Style::default().fg(Color::Yellow)),
+                        .style(Style::default().fg(Color::Cyan)),
                 )
                 .row_highlight_style(Style::default().bg(Color::White))
                 .highlight_symbol("📌 ");
 
-                let news_area = Rect {
-                    x: area.x + 2,
-                    y: area.y + 2,
-                    width: area.width.saturating_sub(4),
-                    height: area.height.saturating_sub(3),
-                };
-
                 drop(news_state_read); // Release the read lock first
                 let mut table_state_write = self.state.write().unwrap().table_state;
-                frame.render_stateful_widget(table, news_area, &mut table_state_write);
+                frame.render_stateful_widget(table, area, &mut table_state_write);
             }
         }
         Ok(())

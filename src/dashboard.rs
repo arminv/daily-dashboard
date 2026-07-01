@@ -93,7 +93,7 @@ impl Component for Dashboard {
         // Left column: calendar (+ greeting) on top, inspiration below it.
         let left_col_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Min(11), Constraint::Length(4)])
+            .constraints(vec![Constraint::Min(11), Constraint::Length(6)])
             .spacing(1)
             .split(top_row_layout[0]);
 

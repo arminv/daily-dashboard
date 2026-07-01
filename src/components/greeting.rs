@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
-    widgets::{Block, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -133,13 +133,17 @@ impl Component for Greeting {
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
-        let title_line_area = Rect {
-            x: area.x + 2,
-            y: area.y + 1,
-            width: area.width,
-            height: area.height.saturating_sub(1),
-        };
-        let title_line_widget = Block::default().title(datetime_str);
+        // The Calendar component is drawn into this same area before us. We
+        // render only the border here — deliberately without `.style()`, which
+        // would recolor the already-drawn calendar — so the calendar shows
+        // through inside the frame.
+        let frame_block = Block::default()
+            .borders(Borders::ALL)
+            .title(datetime_str)
+            .title_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(Color::Cyan));
+        frame.render_widget(frame_block, area);
+
         let greeting_area = Rect {
             x: area.x + 2,
             y: area.y + 3,
@@ -160,7 +164,6 @@ impl Component for Greeting {
         );
         let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Green));
 
-        frame.render_widget(title_line_widget, title_line_area);
         frame.render_widget(greeting_widget, greeting_area);
         frame.render_widget(location_widget, location_area);
         Ok(())

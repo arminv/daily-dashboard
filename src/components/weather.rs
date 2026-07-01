@@ -276,15 +276,16 @@ impl Component for Weather {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("🌤️ Weather")
+            .style(Style::default().fg(Color::Cyan));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
         let weather_str = self.get_weather_display();
-        let weather_area = Rect {
-            x: area.x,
-            y: area.y + 1,
-            width: area.width,
-            height: area.height,
-        };
         let weather_widget = Paragraph::new(weather_str).style(Style::default().fg(Color::Blue));
-        frame.render_widget(weather_widget, weather_area);
+        frame.render_widget(weather_widget, inner);
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -293,7 +294,7 @@ impl Component for Weather {
                 Constraint::Length(0),
                 Constraint::Length(8),
             ])
-            .split(area);
+            .split(inner);
         let main_area = layout[2];
         let padded_chart_area = Rect {
             x: main_area.x,
