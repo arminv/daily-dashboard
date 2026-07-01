@@ -1,6 +1,5 @@
-use crate::{action::Action, app::LoadingStatus, components::Component, tui::Event};
+use crate::{action::Action, app::LoadingStatus, components::Component, http, theme, tui::Event};
 use chrono::Local;
-use color_eyre::eyre::ErrReport;
 use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
@@ -11,7 +10,6 @@ use ratatui::{
 };
 use ratatui_textarea::TextArea;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 use tracing::{error, info};
 
 const DICTIONARY_API_URL: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
@@ -56,12 +54,13 @@ pub struct Dictionary {
     // `TextArea` is not `Send`, so it lives outside the shared state.
     input: TextArea<'static>,
     input_mode: InputMode,
+    client: reqwest::Client,
 }
 
 impl Dictionary {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest::Client) -> Self {
         let mut input = TextArea::default();
-        input.set_cursor_line_style(Style::default().blue());
+        input.set_cursor_line_style(Style::default().green());
         input.set_cursor_style(Style::default().bg(Color::Red));
         input.set_placeholder_text("Lookup a word in dictionary...");
 
@@ -69,6 +68,7 @@ impl Dictionary {
             data: Arc::new(RwLock::new(DictionaryData::default())),
             input,
             input_mode: InputMode::Normal,
+            client,
         }
     }
 
@@ -96,8 +96,9 @@ impl Dictionary {
         }
 
         let data = self.data.clone();
+        let client = self.client.clone();
         tokio::spawn(async move {
-            fetch_word_definition(data, word).await;
+            fetch_word_definition(data, word, client).await;
         });
     }
 
@@ -105,7 +106,7 @@ impl Dictionary {
         let (title, title_style) = match self.input_mode {
             InputMode::Normal => (
                 "🔍 Dictionary — press Esc to type a word",
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(theme::ACCENT),
             ),
             InputMode::Editing => (
                 "🔍 Dictionary — Enter to search · Esc to done",
@@ -126,24 +127,21 @@ impl Dictionary {
     fn render_definitions(&self, frame: &mut Frame, area: Rect) {
         let data = self.data.read().unwrap();
 
-        let block = Block::default()
-            .borders(ratatui::widgets::Borders::ALL)
-            .title("📖 Definition")
-            .style(Style::default().fg(Color::Cyan));
+        let block = theme::panel_block("📖 Definition");
 
         match &data.loading_status {
             LoadingStatus::NotStarted => {
                 let paragraph =
-                    Paragraph::new("Press Esc to type a word, then Enter to look it up.")
+                    Paragraph::new("Press Esc to type a word above, then Enter to look it up.")
                         .block(block)
-                        .style(Style::default().fg(Color::DarkGray))
+                        .style(Style::default().fg(theme::HINT))
                         .wrap(Wrap { trim: true });
                 frame.render_widget(paragraph, area);
             }
             LoadingStatus::Loading => {
                 let paragraph = Paragraph::new(format!("Looking up \"{}\"...", data.search_word))
                     .block(block)
-                    .style(Style::default().fg(Color::Yellow))
+                    .style(Style::default().fg(theme::LOADING))
                     .wrap(Wrap { trim: true });
                 frame.render_widget(paragraph, area);
             }
@@ -179,7 +177,11 @@ impl Dictionary {
     }
 }
 
-async fn fetch_word_definition(data: Arc<RwLock<DictionaryData>>, word: String) {
+async fn fetch_word_definition(
+    data: Arc<RwLock<DictionaryData>>,
+    word: String,
+    client: reqwest::Client,
+) {
     {
         let mut state = data.write().unwrap();
         state.loading_status = LoadingStatus::Loading;
@@ -189,55 +191,11 @@ async fn fetch_word_definition(data: Arc<RwLock<DictionaryData>>, word: String) 
     let api_url = format!("{DICTIONARY_API_URL}/{encoded_word}");
     info!("Dictionary: fetching {api_url}");
 
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-    {
-        Ok(client) => client,
-        Err(e) => {
-            let error_msg = format!("Failed to build HTTP client: {e:?}");
-            error!("Dictionary: {error_msg:?}");
-            let mut state = data.write().unwrap();
-            state.loading_status = LoadingStatus::Error(error_msg);
-            return;
-        }
-    };
-
-    let response = match client.get(&api_url).send().await {
-        Ok(resp) => resp,
-        Err(e) => {
-            let error_msg = format!("API request failed: {e:?}");
-            error!("Dictionary: {error_msg:?}");
-            let mut state = data.write().unwrap();
-            state.loading_status = LoadingStatus::Error(error_msg);
-            return;
-        }
-    };
-
-    if !response.status().is_success() {
-        let error_msg = format!("API returned error status: {}", response.status());
-        error!("Dictionary: {error_msg}");
-        let mut state = data.write().unwrap();
-        state.loading_status = LoadingStatus::Error(error_msg);
-        return;
-    }
-
-    let body_text = match response.text().await {
-        Ok(text) => text,
-        Err(e) => {
-            let error_msg = format!("Failed to read response body: {e:?}");
-            error!("Dictionary: {error_msg:?}");
-            let mut state = data.write().unwrap();
-            state.loading_status = LoadingStatus::Error(error_msg);
-            return;
-        }
-    };
-
-    let json: serde_json::Value = match serde_json::from_str(&body_text) {
+    let json: serde_json::Value = match http::get_json(&client, &api_url).await {
         Ok(json) => json,
         Err(e) => {
-            let error_msg = format!("Failed to parse JSON: {e:?}");
-            error!("Dictionary: {error_msg:?}");
+            let error_msg = format!("{e}");
+            error!("Dictionary: {error_msg}");
             let mut state = data.write().unwrap();
             state.loading_status = LoadingStatus::Error(error_msg);
             return;
@@ -273,10 +231,6 @@ async fn fetch_word_definition(data: Arc<RwLock<DictionaryData>>, word: String) 
     state.loading_status = LoadingStatus::Loaded;
     info!("Dictionary: loaded definition for {:?}", state.search_word);
 }
-
-#[cfg(test)]
-#[path = "../tests/dictionary.rs"]
-mod tests;
 
 fn parse_entry(entry: &serde_json::Value) -> Option<DictionaryEntry> {
     let word = entry.get("word")?.as_str()?.to_string();
@@ -449,9 +403,9 @@ impl Component for Dictionary {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::Tick {
             let cursor_color = if self.input_mode == InputMode::Editing {
-                Color::Blue
-            } else {
                 Color::Red
+            } else {
+                Color::Blue
             };
             self.input
                 .set_cursor_style(Style::default().bg(cursor_color));
@@ -459,15 +413,17 @@ impl Component for Dictionary {
         Ok(None)
     }
 
-    fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<(), ErrReport> {
-        // Input box on top, definition below it.
+    fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(area);
-
         self.render_input(frame, chunks[0]);
         self.render_definitions(frame, chunks[1]);
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/dictionary.rs"]
+mod tests;

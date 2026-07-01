@@ -11,7 +11,9 @@ mod components;
 mod config;
 mod dashboard;
 mod errors;
+mod http;
 mod logging;
+mod theme;
 mod tui;
 
 #[tokio::main]

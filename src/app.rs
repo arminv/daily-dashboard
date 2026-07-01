@@ -10,6 +10,7 @@ use crate::{
     components::Component,
     config::Config,
     dashboard::Dashboard,
+    http,
     tui::{Event, Tui},
 };
 
@@ -17,7 +18,7 @@ pub struct App {
     config: Config,
     tick_rate: f64,
     frame_rate: f64,
-    components: Vec<Box<dyn Component>>,
+    dashboard: Dashboard,
     should_quit: bool,
     should_suspend: bool,
     mode: Mode,
@@ -44,11 +45,11 @@ pub enum LoadingStatus {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let (action_tx, action_rx) = mpsc::unbounded_channel();
-        let dashboard = Dashboard::new();
+        let client = http::shared_client()?;
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(dashboard)],
+            dashboard: Dashboard::new(client),
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
@@ -66,11 +67,11 @@ impl App {
             .frame_rate(self.frame_rate);
         tui.enter()?;
 
-        for component in self.components.iter_mut() {
-            component.register_action_handler(self.action_tx.clone())?;
-            component.register_config_handler(self.config.clone())?;
-            component.init(tui.size()?)?;
-        }
+        self.dashboard
+            .register_action_handler(self.action_tx.clone())?;
+        self.dashboard
+            .register_config_handler(self.config.clone())?;
+        self.dashboard.init(tui.size()?)?;
 
         let action_tx = self.action_tx.clone();
         loop {
@@ -107,10 +108,8 @@ impl App {
             _ => {}
         }
 
-        for component in self.components.iter_mut() {
-            if let Some(action) = component.handle_events(Some(event.clone()))? {
-                action_tx.send(action)?;
-            }
+        if let Some(action) = self.dashboard.handle_events(Some(event.clone()))? {
+            action_tx.send(action)?;
         }
         Ok(())
     }
@@ -158,10 +157,8 @@ impl App {
                 _ => {}
             }
 
-            for component in self.components.iter_mut() {
-                if let Some(action) = component.update(action.clone())? {
-                    self.action_tx.send(action)?
-                };
+            if let Some(action) = self.dashboard.update(action.clone())? {
+                self.action_tx.send(action)?;
             }
         }
         Ok(())
@@ -180,12 +177,10 @@ impl App {
                 return;
             }
 
-            for component in self.components.iter_mut() {
-                if let Err(err) = component.draw(frame, frame.area()) {
-                    let _ = self
-                        .action_tx
-                        .send(Action::Error(format!("Failed to draw: {err:?}")));
-                }
+            if let Err(err) = self.dashboard.draw(frame, frame.area()) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {err:?}")));
             }
         })?;
         Ok(())

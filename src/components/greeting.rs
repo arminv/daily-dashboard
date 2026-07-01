@@ -1,12 +1,12 @@
 use super::Component;
-use crate::app::LoadingStatus;
+use crate::{app::LoadingStatus, http, theme};
 use chrono::Local;
 use color_eyre::Result;
 use ratatui::{
     Frame,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -35,11 +35,15 @@ pub struct GreetingState {
 #[derive(Debug, Default, Clone)]
 pub struct Greeting {
     pub state: Arc<RwLock<GreetingState>>,
+    client: reqwest::Client,
 }
 
 impl Greeting {
-    pub fn new() -> Self {
-        let greeting = Self::default();
+    pub fn new(client: reqwest::Client) -> Self {
+        let greeting = Self {
+            client,
+            ..Self::default()
+        };
         greeting.run();
         greeting
     }
@@ -85,7 +89,7 @@ impl Greeting {
             Err(error) => {
                 error!("Error fetching public IP: {}", error);
                 self.set_loading_state(LoadingStatus::Error(format!(
-                    "Failed to get public IP: {error:?}",
+                    "Failed to get public IP: {error}",
                 )));
             }
         }
@@ -94,12 +98,11 @@ impl Greeting {
     async fn get_public_ip(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Try multiple IP API services in case one fails
         for api_url in IP_API_URLS {
-            match reqwest::get(api_url).await {
-                Ok(response) => {
-                    if let Ok(ip) = response.text().await
-                        && !ip.trim().is_empty()
-                    {
-                        return Ok(ip.trim().to_string());
+            match http::get_text(&self.client, api_url).await {
+                Ok(ip) => {
+                    let ip = ip.trim().to_string();
+                    if !ip.is_empty() {
+                        return Ok(ip);
                     }
                 }
                 Err(_) => continue,
@@ -118,7 +121,7 @@ impl Greeting {
             LoadingStatus::Loaded => {
                 format!("🌐 {}, {}", state.location.city, state.location.country,)
             }
-            LoadingStatus::Error(ref error) => format!("Location error: {error:?}"),
+            LoadingStatus::Error(ref error) => format!("Location error: {error}"),
         }
     }
 }
@@ -133,39 +136,31 @@ impl Component for Greeting {
         let datetime_str = now.format("%a, %b %d, %Y %H:%M:%S").to_string();
         let location_str = self.get_location_display();
 
-        // The Calendar component is drawn into this same area before us. We
-        // render only the border here — deliberately without `.style()`, which
-        // would recolor the already-drawn calendar — so the calendar shows
-        // through inside the frame.
-        let frame_block = Block::default()
-            .borders(Borders::ALL)
-            .title(datetime_str)
-            .title_style(Style::default().fg(Color::Cyan))
-            .border_style(Style::default().fg(Color::Cyan));
-        frame.render_widget(frame_block, area);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(area);
 
-        let greeting_area = Rect {
-            x: area.x + 2,
-            y: area.y + 3,
-            width: area.width.min(30),
-            height: 2,
-        };
-        let location_area = Rect {
-            x: area.x + 2,
-            y: area.y + 4,
-            width: area.width.min(30),
-            height: 1,
-        };
-
-        let greeting_widget = Paragraph::new(greeting_message).style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .fg(Color::White),
+        frame.render_widget(
+            Paragraph::new(datetime_str).style(Style::default().fg(theme::ACCENT)),
+            chunks[0],
         );
-        let location_widget = Paragraph::new(location_str).style(Style::default().fg(Color::Green));
-
-        frame.render_widget(greeting_widget, greeting_area);
-        frame.render_widget(location_widget, location_area);
+        frame.render_widget(
+            Paragraph::new(greeting_message).style(
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::White),
+            ),
+            chunks[1],
+        );
+        frame.render_widget(
+            Paragraph::new(location_str).style(Style::default().fg(Color::Green)),
+            chunks[2],
+        );
         Ok(())
     }
 }

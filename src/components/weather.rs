@@ -1,5 +1,5 @@
 use super::{Component, greeting::GreetingState};
-use crate::{action::Action, app::LoadingStatus, components::greeting::Greeting};
+use crate::{action::Action, app::LoadingStatus, http, theme};
 use chrono::{Datelike, Local, NaiveDate};
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
@@ -25,17 +25,17 @@ pub struct WeatherState {
 pub struct Weather {
     state: Arc<RwLock<WeatherState>>,
     greeting_state: Arc<RwLock<GreetingState>>,
+    client: reqwest::Client,
 }
 
 const REFETCH_WEATHER_IN_MINS: i64 = 10;
 
 impl Weather {
-    pub fn new() -> Self {
-        let greeting = Greeting::new();
-        let greeting_state = greeting.state.clone();
+    pub fn new(client: reqwest::Client, greeting_state: Arc<RwLock<GreetingState>>) -> Self {
         Self {
             state: Arc::new(RwLock::new(WeatherState::default())),
             greeting_state,
+            client,
         }
     }
 
@@ -99,38 +99,11 @@ impl Weather {
         let api_url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7&timezone={timezone}",
         );
-        let response = match reqwest::get(&api_url).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                let error_msg = format!("API request failed: {e:?}");
-                error!("Weather: {error_msg:?}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
-                return;
-            }
-        };
-
-        if !response.status().is_success() {
-            let error_msg = format!("API returned error status: {}", response.status());
-            error!("Weather: {}", error_msg);
-            self.set_loading_state(LoadingStatus::Error(error_msg));
-            return;
-        }
-
-        let body_text = match response.text().await {
-            Ok(text) => text,
-            Err(e) => {
-                let error_msg = format!("Failed to read response body: {e:?}",);
-                error!("Weather: {error_msg:?}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
-                return;
-            }
-        };
-
-        let json: serde_json::Value = match serde_json::from_str(&body_text) {
+        let json: serde_json::Value = match http::get_json(&self.client, &api_url).await {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("Failed to parse JSON: {e:?}");
-                error!("Weather: {error_msg:?}");
+                let error_msg = format!("Weather: {e}");
+                error!("{error_msg}");
                 self.set_loading_state(LoadingStatus::Error(error_msg));
                 return;
             }
@@ -169,42 +142,10 @@ impl Weather {
             weather_state.icon = self.get_weather_icon(code_value);
         }
 
-        if let Some(daily) = json.get("daily") {
-            weather_state.daily_weekdays.clear();
-            weather_state.daily_high_temperatures.clear();
-            weather_state.daily_low_temperatures.clear();
-
-            let temp_max_array = daily.get("temperature_2m_max");
-            let temp_min_array = daily.get("temperature_2m_min");
-            let time_array = daily.get("time");
-
-            if let Some(time_values) = time_array.and_then(|a| a.as_array()) {
-                for time_value in time_values {
-                    let date_str = time_value.as_str().unwrap_or("???");
-                    weather_state.daily_weekdays.push(
-                        NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                            .map(|date| date.weekday().to_string())
-                            .unwrap_or("???".to_string()),
-                    );
-                }
-            }
-
-            if let Some(max_temps) = temp_max_array.and_then(|a| a.as_array()) {
-                weather_state.daily_high_temperatures.extend(
-                    max_temps
-                        .iter()
-                        .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
-                );
-            }
-
-            if let Some(min_temps) = temp_min_array.and_then(|a| a.as_array()) {
-                weather_state.daily_low_temperatures.extend(
-                    min_temps
-                        .iter()
-                        .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
-                );
-            }
-        }
+        let (weekdays, highs, lows) = parse_daily_forecast(&json);
+        weather_state.daily_weekdays = weekdays;
+        weather_state.daily_high_temperatures = highs;
+        weather_state.daily_low_temperatures = lows;
 
         weather_state.loading_status = LoadingStatus::Loaded;
         weather_state.last_updated_at = Some(Local::now());
@@ -238,6 +179,41 @@ impl Weather {
             }
         }
     }
+}
+
+/// Parse the 7-day forecast (weekday names + high/low temps) from the
+/// Open-Meteo response. Pure (no I/O) so it can be unit-tested.
+fn parse_daily_forecast(json: &serde_json::Value) -> (Vec<String>, Vec<f32>, Vec<f32>) {
+    let mut weekdays = Vec::new();
+    let mut highs = Vec::new();
+    let mut lows = Vec::new();
+    if let Some(daily) = json.get("daily") {
+        if let Some(time_values) = daily.get("time").and_then(|a| a.as_array()) {
+            for time_value in time_values {
+                let date_str = time_value.as_str().unwrap_or("???");
+                weekdays.push(
+                    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                        .map(|date| date.weekday().to_string())
+                        .unwrap_or("???".to_string()),
+                );
+            }
+        }
+        if let Some(max_temps) = daily.get("temperature_2m_max").and_then(|a| a.as_array()) {
+            highs.extend(
+                max_temps
+                    .iter()
+                    .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+            );
+        }
+        if let Some(min_temps) = daily.get("temperature_2m_min").and_then(|a| a.as_array()) {
+            lows.extend(
+                min_temps
+                    .iter()
+                    .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+            );
+        }
+    }
+    (weekdays, highs, lows)
 }
 
 impl Component for Weather {
@@ -276,10 +252,7 @@ impl Component for Weather {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title("🌤️ Weather")
-            .style(Style::default().fg(Color::Cyan));
+        let block = theme::panel_block("🌤️ Weather");
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
@@ -307,7 +280,7 @@ impl Component for Weather {
             let state = match self.state.read() {
                 Ok(daily_high_temperatures) => daily_high_temperatures,
                 Err(_) => {
-                    eprintln!("Weather: Failed to read state");
+                    error!("Weather: Failed to read state");
                     return Ok(());
                 }
             };
@@ -320,7 +293,7 @@ impl Component for Weather {
                 let state = match self.state.read() {
                     Ok(state) => state,
                     Err(_) => {
-                        eprintln!("Weather: Failed to read state");
+                        error!("Weather: Failed to read state");
                         return Ok(());
                     }
                 };
@@ -418,3 +391,7 @@ fn temperature_style(value: f32) -> Style {
 
     Style::new().fg(Color::Rgb(r, g, b))
 }
+
+#[cfg(test)]
+#[path = "../tests/weather.rs"]
+mod tests;

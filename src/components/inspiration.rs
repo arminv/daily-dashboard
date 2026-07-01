@@ -1,12 +1,12 @@
 use super::Component;
-use crate::{action::Action, app::LoadingStatus};
+use crate::{action::Action, app::LoadingStatus, http, theme};
 use color_eyre::Result;
 use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
 };
 use std::sync::{Arc, RwLock};
 use tracing::error;
@@ -23,12 +23,14 @@ pub struct InspirationState {
 #[derive(Clone, Debug)]
 pub struct Inspiration {
     state: Arc<RwLock<InspirationState>>,
+    client: reqwest::Client,
 }
 
 impl Inspiration {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest::Client) -> Self {
         Self {
             state: Arc::new(RwLock::new(InspirationState::default())),
+            client,
         }
     }
 
@@ -57,21 +59,9 @@ impl Inspiration {
     }
 
     async fn fetch_quote(&self) -> Result<(String, String), String> {
-        let response = reqwest::get(QUOTE_API_URL)
+        let json = http::get_json(&self.client, QUOTE_API_URL)
             .await
-            .map_err(|e| format!("API request failed: {e:?}"))?;
-
-        if !response.status().is_success() {
-            return Err(format!("API returned error status: {}", response.status()));
-        }
-
-        let body_text = response
-            .text()
-            .await
-            .map_err(|e| format!("Failed to read response body: {e:?}"))?;
-
-        let json: serde_json::Value =
-            serde_json::from_str(&body_text).map_err(|e| format!("Failed to parse JSON: {e:?}"))?;
+            .map_err(|e| format!("Failed to fetch quote: {e}"))?;
 
         let entry = json
             .as_array()
@@ -92,6 +82,27 @@ impl Inspiration {
 
         Ok((quote_text, quote_author))
     }
+}
+
+/// Render a bordered status panel (title + one-line message) for the
+/// NotStarted / Loading / Error states of the inspiration widget.
+fn render_status(
+    frame: &mut Frame,
+    area: Rect,
+    title: String,
+    color: Color,
+    message: String,
+    message_color: Color,
+) {
+    let block = theme::panel_block_colored(title, color);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    frame.render_widget(
+        Paragraph::new(message)
+            .style(Style::default().fg(message_color))
+            .wrap(Wrap { trim: true }),
+        inner,
+    );
 }
 
 impl Component for Inspiration {
@@ -119,74 +130,55 @@ impl Component for Inspiration {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let inspiration_state_read = self.state.read().unwrap();
 
-        let block = |title: String, color: Color| {
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .style(Style::default().fg(color))
-        };
-
         match &inspiration_state_read.loading_status {
-            LoadingStatus::NotStarted => {
-                let b = block("✨ Daily Inspiration".to_string(), Color::Cyan);
-                let inner = b.inner(area);
-                frame.render_widget(b, area);
-                frame.render_widget(
-                    Paragraph::new("Fetching today's quote...")
-                        .style(Style::default().fg(Color::DarkGray))
-                        .wrap(Wrap { trim: true }),
-                    inner,
-                );
-            }
-            LoadingStatus::Loading => {
-                let b = block(
-                    "✨ Daily Inspiration — Loading...".to_string(),
-                    Color::Yellow,
-                );
-                let inner = b.inner(area);
-                frame.render_widget(b, area);
-                frame.render_widget(
-                    Paragraph::new("Fetching today's quote...")
-                        .style(Style::default().fg(Color::DarkGray))
-                        .wrap(Wrap { trim: true }),
-                    inner,
-                );
-            }
-            LoadingStatus::Error(error) => {
-                let b = block(format!("✨ Daily Inspiration — Error: {error}"), Color::Red);
-                let inner = b.inner(area);
-                frame.render_widget(b, area);
-                frame.render_widget(
-                    Paragraph::new(format!("Couldn't load today's quote: {error}"))
-                        .style(Style::default().fg(Color::LightRed))
-                        .wrap(Wrap { trim: true }),
-                    inner,
-                );
-            }
+            LoadingStatus::NotStarted => render_status(
+                frame,
+                area,
+                "✨ Daily Inspiration".to_string(),
+                theme::ACCENT,
+                "Fetching today's quote...".to_string(),
+                theme::HINT,
+            ),
+            LoadingStatus::Loading => render_status(
+                frame,
+                area,
+                "✨ Daily Inspiration — Loading...".to_string(),
+                theme::LOADING,
+                "Fetching today's quote...".to_string(),
+                theme::HINT,
+            ),
+            LoadingStatus::Error(error) => render_status(
+                frame,
+                area,
+                format!("✨ Daily Inspiration — Error: {error}"),
+                theme::ERROR,
+                format!("Couldn't load today's quote: {error}"),
+                Color::LightRed,
+            ),
             LoadingStatus::Loaded => {
                 let quote_line = Line::from(vec![
-                    Span::styled("❝", Style::default().fg(Color::Cyan)),
+                    Span::styled("❝", Style::default().fg(theme::ACCENT)),
                     Span::styled(
                         inspiration_state_read.quote_text.clone(),
                         Style::default()
                             .fg(Color::White)
                             .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled("❞", Style::default().fg(Color::Cyan)),
+                    Span::styled("❞", Style::default().fg(theme::ACCENT)),
                 ]);
 
                 let author_line = Line::from(vec![
-                    Span::styled("— ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("— ", Style::default().fg(theme::HINT)),
                     Span::styled(
                         inspiration_state_read.quote_author.clone(),
                         Style::default()
-                            .fg(Color::DarkGray)
+                            .fg(theme::HINT)
                             .add_modifier(Modifier::ITALIC),
                     ),
                 ]);
 
                 let paragraph = Paragraph::new(vec![quote_line, author_line])
-                    .block(block("✨ Daily Inspiration".to_string(), Color::Cyan))
+                    .block(theme::panel_block("✨ Daily Inspiration"))
                     .style(Style::new().cyan())
                     .wrap(Wrap { trim: true });
 
@@ -196,3 +188,7 @@ impl Component for Inspiration {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/inspiration.rs"]
+mod tests;
