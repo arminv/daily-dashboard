@@ -7,7 +7,7 @@
 A terminal dashboard you can keep open all day - weather, news, a calendar, a
 daily quote, and a built-in dictionary, all in one `ratatui` screen.
 
-Daily Dashboard Demo
+![Daily Dashboard Demo](Demo.png)
 
 ## Features
 
