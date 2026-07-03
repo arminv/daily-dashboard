@@ -14,6 +14,7 @@ pub mod fps;
 pub mod greeting;
 pub mod inspiration;
 pub mod news;
+pub mod picture_frame;
 pub mod weather;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.

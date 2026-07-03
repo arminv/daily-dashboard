@@ -32,11 +32,45 @@ pub async fn get_text(client: &reqwest::Client, url: &str) -> Result<String> {
         .send()
         .await
         .wrap_err_with(|| format!("request failed for {url}"))?;
+    let status = response.status();
     let response = response
         .error_for_status()
-        .wrap_err_with(|| format!("HTTP error from {url}"))?;
+        .wrap_err_with(|| format!("HTTP {status} from {url}"))?;
     response
         .text()
         .await
         .wrap_err_with(|| format!("failed to read response body from {url}"))
 }
+
+/// GET `url`, follow redirects, require a 2xx response, and return the raw body
+/// bytes together with the final (post-redirect) URL.
+///
+/// Used for binary downloads (e.g. fetching an image file to decode). The final
+/// URL is returned because Lorem Picsum redirects `/seed/<seed>/...` to a
+/// canonical `/id/<id>/...` image URL whose `id` is needed for the metadata
+/// lookup.
+pub async fn get_bytes_redirected(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<(Vec<u8>, String)> {
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .wrap_err_with(|| format!("request failed for {url}"))?;
+    let status = response.status();
+    let final_url = response.url().to_string();
+    let response = response
+        .error_for_status()
+        .wrap_err_with(|| format!("HTTP {status} from {url}"))?;
+    response
+        .bytes()
+        .await
+        .map(|bytes| bytes.to_vec())
+        .map(|bytes| (bytes, final_url))
+        .wrap_err_with(|| format!("failed to read response body from {url}"))
+}
+
+#[cfg(test)]
+#[path = "tests/http.rs"]
+mod tests;

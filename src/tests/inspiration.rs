@@ -38,7 +38,7 @@ fn inspiration_loaded_renders_quote_and_author() {
         "author should be rendered: {rendered:?}"
     );
     assert!(
-        rendered.contains("Daily Inspiration"),
+        rendered.contains("Daily Quote"),
         "panel title should be rendered: {rendered:?}"
     );
 }

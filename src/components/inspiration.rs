@@ -134,7 +134,7 @@ impl Component for Inspiration {
             LoadingStatus::NotStarted => render_status(
                 frame,
                 area,
-                "✨ Daily Inspiration".to_string(),
+                "✨ Daily Quote".to_string(),
                 theme::ACCENT,
                 "Fetching today's quote...".to_string(),
                 theme::HINT,
@@ -142,7 +142,7 @@ impl Component for Inspiration {
             LoadingStatus::Loading => render_status(
                 frame,
                 area,
-                "✨ Daily Inspiration — Loading...".to_string(),
+                "✨ Daily Quote — Loading...".to_string(),
                 theme::LOADING,
                 "Fetching today's quote...".to_string(),
                 theme::HINT,
@@ -150,7 +150,7 @@ impl Component for Inspiration {
             LoadingStatus::Error(error) => render_status(
                 frame,
                 area,
-                format!("✨ Daily Inspiration — Error: {error}"),
+                format!("✨ Daily Quote — Error: {error}"),
                 theme::ERROR,
                 format!("Couldn't load today's quote: {error}"),
                 Color::LightRed,
@@ -178,7 +178,7 @@ impl Component for Inspiration {
                 ]);
 
                 let paragraph = Paragraph::new(vec![quote_line, author_line])
-                    .block(theme::panel_block("✨ Daily Inspiration"))
+                    .block(theme::panel_block("✨ Daily Quote"))
                     .style(Style::new().cyan())
                     .wrap(Wrap { trim: true });
 
