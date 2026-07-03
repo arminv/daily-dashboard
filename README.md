@@ -30,14 +30,9 @@ and has no meaningful rate limit).
 
 The daily picture is rendered via `ratatui-image`, which auto-detects your
 terminal's graphics protocol (kitty / iTerm2 / sixel) and falls back to unicode
-halfblocks. Warp uses the iTerm2 (OSC 1337) inline-image protocol for a sharp,
-full-resolution render (it supports iTerm2 images but not Kitty Unicode
-placeholders, which would show as `[?]` tofu). The VS Code / Cursor integrated
-terminal defaults to halfblocks, because its inline-image support
-(`terminal.integrated.enableImages`) is off by default and a graphics protocol
-would otherwise render nothing; if you've enabled that setting, set
-`DAILY_DASHBOARD_IMAGE_PROTOCOL=iterm2` for a full-resolution image. If a
-terminal shows `[?]` boxes instead of the photo, auto-detection picked a protocol
+halfblocks.
+
+If a terminal shows `[?]` boxes instead of the photo, auto-detection picked a protocol
 it can't actually render (common inside `tmux`); set
 `DAILY_DASHBOARD_IMAGE_PROTOCOL=halfblocks` (works everywhere) or force
 `kitty` / `sixel` / `iterm2` / `auto`.
