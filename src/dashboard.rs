@@ -7,6 +7,7 @@ use crate::{
         greeting::Greeting,
         inspiration::Inspiration,
         news::News,
+        picture_frame::PictureFrame,
         weather::Weather,
     },
     config::Config,
@@ -25,6 +26,7 @@ pub struct Dashboard {
     weather: Weather,
     inspiration: Inspiration,
     dictionary: Dictionary,
+    picture_frame: PictureFrame,
     news: News,
 }
 
@@ -34,23 +36,32 @@ impl Dashboard {
         // of spawning a second, redundant geolocation lookup.
         let greeting = Greeting::new(client.clone());
         let weather = Weather::new(client.clone(), greeting.state.clone());
+        // Detect the terminal's image graphics protocol + font size. Done here
+        // (inside `App::new()`, before `tui.enter()` starts the crossterm event
+        // loop) so `from_query_stdio`'s stdin query doesn't race the
+        // `EventStream`. `DAILY_DASHBOARD_IMAGE_PROTOCOL` can override the
+        // protocol; auto-detect falls back to universal halfblocks.
+        let picker = PictureFrame::build_picker();
+        let picture_frame = PictureFrame::new(client.clone(), picker);
         Self {
             calendar: Calendar::new(),
             greeting,
             weather,
             inspiration: Inspiration::new(client.clone()),
             dictionary: Dictionary::new(client.clone()),
+            picture_frame,
             news: News::new(client),
         }
     }
 
-    fn components(&mut self) -> [&mut dyn Component; 6] {
+    fn components(&mut self) -> [&mut dyn Component; 7] {
         [
             &mut self.calendar,
             &mut self.greeting,
             &mut self.weather,
             &mut self.inspiration,
             &mut self.dictionary,
+            &mut self.picture_frame,
             &mut self.news,
         ]
     }
@@ -150,8 +161,16 @@ impl Component for Dashboard {
         }
         self.inspiration.draw(frame, left_col_layout[1])?;
         self.weather.draw(frame, top_row_layout[1])?;
-        self.dictionary.draw(frame, top_row_layout[2])?;
-        self.news.draw(frame, page_layout[1])?;
+        self.picture_frame.draw(frame, top_row_layout[2])?;
+
+        let bottom_row_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
+            .flex(Flex::SpaceBetween)
+            .spacing(1)
+            .split(page_layout[1]);
+        self.dictionary.draw(frame, bottom_row_layout[0])?;
+        self.news.draw(frame, bottom_row_layout[1])?;
         Ok(())
     }
 }

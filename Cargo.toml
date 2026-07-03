@@ -52,6 +52,21 @@ chrono = "0.4"
 time = "0.3.41"
 open = "5.0"
 ratatui-textarea = "0.9.2"
+# Image rendering for the `picture_frame` widget. `default-features = false` is required:
+# `ratatui-image`'s defaults pull in `chafa-dyn` (its build.rs fails the build
+# unless the native `libchafa` is found via pkg-config) and `image-defaults`
+# (all of the `image` crate's default decoders). We enable only `crossterm` +
+# `tokio` and control image formats ourselves via the separate `image` dep below.
+ratatui-image = { version = "11.0", default-features = false, features = [
+    "crossterm",
+    "tokio",
+] }
+image = { version = "0.25", default-features = false, features = [
+    "jpeg",
+    "png",
+    "webp",
+    "gif",
+] }
 
 [build-dependencies]
 anyhow = "1.0.90"

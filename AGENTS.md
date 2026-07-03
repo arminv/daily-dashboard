@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## Project Overview
 
-Daily Dashboard is a Terminal User Interface (TUI) application written in Rust that shows a greeting/location, calendar, weather, daily inspirational quote, an interactive dictionary, and a news feed in a single dashboard. It uses `ratatui` for the TUI framework and follows an async, component-based architecture.
+Daily Dashboard is a Terminal User Interface (TUI) application written in Rust that shows a greeting/location, calendar, weather, a daily picture, a daily inspirational quote, an interactive dictionary, and a news feed in a single dashboard. It uses `ratatui` for the TUI framework and follows an async, component-based architecture.
 
 ## Essential Commands
 
@@ -54,8 +54,8 @@ cargo test -- --ignored
 | `src/action.rs`       | The `Action` enum (Tick, Render, Resize, Quit, Suspend, Resume, Error, …).                                                      |
 | `src/dashboard.rs`    | The only top-level `Component` registered in `App`. Owns and lays out all widgets.                                              |
 | `src/components.rs`   | The `Component` trait and the widget submodule declarations.                                                                    |
-| `src/components/*.rs` | The widgets: `calendar`, `greeting`, `weather`, `inspiration`, `dictionary`, `news`, `fps` (disabled).                          |
-| `src/http.rs`         | Shared `reqwest::Client` + `get_json` / `get_text` helpers used by every fetch.                                                 |
+| `src/components/*.rs` | The widgets: `calendar`, `greeting`, `weather`, `picture_frame`, `inspiration`, `dictionary`, `news`, `fps` (disabled).         |
+| `src/http.rs`         | Shared `reqwest::Client` + `get_json` / `get_text` / `get_bytes_redirected` helpers used by every fetch.                        |
 | `src/theme.rs`        | Centralized border/title/color styles (`panel_block`, `panel_block_colored`, `frame_block`, `ACCENT`/`LOADING`/`ERROR`/`HINT`). |
 | `src/config.rs`       | Layered config loading + keybinding/style parsing.                                                                              |
 | `src/cli.rs`          | `clap` CLI definition (`--tick-rate`, `--frame-rate`).                                                                          |
@@ -91,14 +91,19 @@ Each widget implements the `Component` trait defined in `src/components.rs`:
 ┌──────────────────────────────────────────────────────────────┐
 │  Top 40%                                                      │
 │  ┌───────────────────┬─────────────────┬────────────────────┐ │
-│  │ Calendar          │ Weather         │ Dictionary         │ │
-│  │ (greeting left,   │ (current cond.  │ (search input +    │ │
-│  │  grid top-right)  │  + 7-day fc)    │  definitions)      │ │
+│  │ Calendar          │ Weather         │ Daily Picture      │ │
+│  │ (greeting left,   │ (current cond.  │ (Lorem Picsum photo│ │
+│  │  grid top-right)  │  + 7-day fc)    │  + hint)           │ │
 │  ├───────────────────┤                 │                    │ │
 │  │ Daily Inspiration │                 │                    │ │
 │  └───────────────────┴─────────────────┴────────────────────┘ │
 ├──────────────────────────────────────────────────────────────┤
-│  Bottom 60%: News feed table                                  │
+│  Bottom 60%                                                   │
+│  ┌──────────────────────┬───────────────────────────────────┐ │
+│  │ Dictionary (1/3)      │ News feed table (2/3)             │ │
+│  │ (search input +       │ (scrollable, categorized)         │ │
+│  │  definitions)         │                                   │ │
+│  └──────────────────────┴───────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,7 +112,8 @@ Layout details (`Dashboard::draw`):
 - Vertical split: top 40% / bottom 60% (`Flex::SpaceBetween`, 1-row spacing).
 - Top row: three horizontal columns (`Min(30)` each).
 - **Left column** is a single framed panel (`theme::frame_block("📅 Calendar")`) owned by the Dashboard. Inside, the greeting and month grid are laid out responsively: when the panel is wide enough (inner width ≥ `GREETING_MIN_WIDTH + MONTHLY_WIDTH` = 49), `Greeting` sits on the left and the `Calendar` grid goes at the top-right; on narrower terminals they stack — greeting on top, grid below (right-aligned) — so the datetime line isn't clipped. The grid itself is right-aligned within whatever area it receives (`Calendar::draw`). Below the panel sits `Inspiration` (`Length(6)`).
-- Middle column: `Weather`. Right column: `Dictionary` (occupies the full top-right column so the definition renders below its input). Bottom: `News`.
+- Middle column: `Weather`. Right column: `Daily Picture` (occupies the full top-right column; the photo renders with `ratatui_image::StatefulImage` (`Resize::Fit`) with a 2-row hint line below it showing the `Shift+N` shortcut).
+- **Bottom 60%** is split horizontally into `Dictionary` (`Ratio(1, 3)`, left) and `News` (`Ratio(2, 3)`, right) with 1-col spacing (`Flex::SpaceBetween`). The dictionary renders its `ratatui-textarea` search input with definitions below it.
 
 Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard owns the frame and hands each widget a `Layout`-derived sub-`Rect`.
 
@@ -119,6 +125,7 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - **Inspiration** (`src/components/inspiration.rs`) — daily inspirational quote via ZenQuotes.
 - **Dictionary** (`src/components/dictionary.rs`) — interactive word lookup via the Free Dictionary API; `ratatui-textarea` input with inline definition rendering.
 - **News** (`src/components/news.rs`) — scrollable, categorized news table with keyboard navigation and browser links.
+- **Daily Picture** (`src/components/picture_frame.rs`) — a random photo from Lorem Picsum's `/{w}/{h}` endpoint (which serves a different image per request; no API key, no rate limit) rendered via `ratatui-image` (auto-detects kitty/iTerm2/sixel; falls back to unicode halfblocks). Uses `StatefulImage` + `ThreadProtocol` so resize/encode is offloaded off the render path. The panel title is the static "🖼 Daily Picture"; no per-image metadata is fetched or shown, and a one-line hint below the image advertises `Shift+N`. It fetches once on startup, then only on demand: pressing `Shift+N` sets `ImageState.refetch_requested`, and the next `maybe_spawn_fetch` grabs a fresh random photo (deferred if a fetch is already in flight). A failed fetch is not auto-retried — press `Shift+N` to try again (the last-good image keeps showing if one was already loaded). The handler matches on the uppercase `N` character (exactly what Shift+N produces), so lowercase `n` and any `Ctrl`/`Ctrl+Shift` combo (reported by terminals as lowercase `Ctrl+n`) are ignored. On resize, `App::handle_resize` calls `tui.resize()` (ratatui's `Terminal::resize`), which clears the viewport (`ESC[2J`) and resets ratatui's back buffer so the next render repaints everything. (It must **not** call `Terminal::clear`, which does a blocking `ESC[6n` cursor-position round-trip that our background `EventStream` starves, timing out with "The cursor position could not be read within a normal duration".) Note that `ESC[2J` doesn't reliably evict images already _placed_ by a graphics protocol (iTerm2/kitty/sixel), so a resize can still leave an on-screen ghost; pressing `Shift+N` re-fetches and re-installs the protocol (`replace_protocol`), which re-places the image cleanly. A `Clear` widget in the draw would _not_ help — ratatui resets the frame buffer every pass (`swap_buffers`), and the ghost lives on the terminal surface, not in the buffer. Override the protocol with `DAILY_DASHBOARD_IMAGE_PROTOCOL=auto|halfblocks|kitty|sixel|iterm2`; Warp is forced to `iTerm2` (it renders the iTerm2 OSC 1337 inline-image protocol but not Kitty Unicode placeholders, which would emit `[?]` tofu); the VS Code/Cursor integrated terminal (`TERM_PROGRAM=vscode`) is forced to `halfblocks` because its inline-image support (`terminal.integrated.enableImages`) is off by default yet it still answers graphics capability queries, so a graphics protocol would render nothing (override with `DAILY_DASHBOARD_IMAGE_PROTOCOL=iterm2` if you enabled that setting); use `halfblocks` for any other terminal that emits `[?]` tofu (e.g. inside `tmux`).
 - **FPS** (`src/components/fps.rs`) — performance counter (disabled / dead code).
 
 ### Event System
@@ -135,11 +142,12 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - `LoadingStatus` enum (`src/app.rs`) tracks async states: `NotStarted`, `Loading`, `Loaded`, `Error(String)`. Error strings use `Display` formatting (`{e}`), not `{e:?}`.
 - Async data fetching uses `tokio::spawn` inside `update()` on `Action::Tick` (or on submit for the Dictionary). The `TextArea` is not `Send`, so the Dictionary keeps it outside the `Arc<RwLock<DictionaryData>>` it shares with its spawn task.
 - **Weather depends on location data from the Greeting component's shared state** — `Dashboard` constructs `Greeting` first and passes `greeting.state.clone()` into `Weather::new(...)`, so there is exactly one location fetch on startup.
+- **Daily Picture** keeps the non-`Clone` `ratatui_image::ThreadProtocol` (the `StatefulImage` state) as a direct field, outside the `Arc<RwLock<ImageState>>` it shares with its fetch task. The fetch task only clones `client` + `state` and decodes bytes to an `image::DynamicImage` (stored as `state.pending_image`); the main thread then creates the protocol from the `Picker` in `update()` (`install_pending_image`). The `Picker` is built once in `Dashboard::new()` (i.e. inside `App::new()`, **before** `tui.enter()` starts the event loop) via `Picker::from_query_stdio()` so its stdin query doesn't race crossterm's `EventStream`, falling back to `Picker::halfblocks()` on terminals with no graphics protocol.
 
 ### HTTP & Data Fetching
 
 - `src/http.rs` builds one shared `reqwest::Client` (10s timeout, `daily-dashboard/<version>` user-agent, pooled connections). Cloning a `Client` is cheap, so the single client is cloned into each fetching widget instead of being rebuilt per request.
-- `http::get_json(url)` and `http::get_text(url)` handle the GET → `error_for_status` → body decode → JSON parse ladder, returning `color_eyre::Result`. Every widget fetch (greeting, weather, news, inspiration, dictionary) goes through these helpers.
+- `http::get_json(url)`, `http::get_text(url)`, and `http::get_bytes_redirected(url)` handle the GET → `error_for_status` → body decode → JSON / text / raw bytes ladder, returning `color_eyre::Result`. Every widget fetch (greeting, weather, news, inspiration, dictionary) goes through these helpers; the Daily Picture widget uses `get_bytes_redirected` for the image file and decodes it with `image::load_from_memory`.
 - IP **geolocation** still uses the `ipgeolocate` crate (`ip-api.com`) directly, separate from the `http` helpers.
 
 ### Theming
@@ -155,11 +163,14 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - **Weather**: every 10 minutes (after location is loaded).
 - **News**: every 30 minutes.
 - **Inspiration**: once on the first tick (daily quote).
+- **Daily Picture**: once on startup, then only on demand via `Shift+N` (a fresh random Lorem Picsum photo each time). `Shift+N` sets `ImageState.refetch_requested`, honored by the next `maybe_spawn_fetch` (deferred if a fetch is already in flight). A failed fetch is not auto-retried; press `Shift+N` to retry (the last-good image keeps showing if one was already loaded).
 - **Dictionary**: on demand, when the user submits a word.
 
 ## Key Dependencies
 
 - **ratatui** 0.30.1 — TUI framework (`widget-calendar` feature for the month grid)
+- **ratatui-image** 11.0 — image rendering for the Daily Picture widget (kitty/iTerm2/sixel/halfblocks; `crossterm` + `tokio` features enabled, `chafa` and `image-defaults` disabled to avoid the native `libchafa` dependency and to control image formats ourselves)
+- **image** 0.25 — image decoding (`jpeg`/`png`/`webp`/`gif`) for the Daily Picture widget
 - **ratatui-textarea** 0.9.2 — editable text input for the Dictionary
 - **crossterm** 0.29.0 — terminal input/output (with `event-stream`)
 - **tokio** 1.40.0 — async runtime (full features)
@@ -185,7 +196,7 @@ Supports:
 
 - Keybindings per mode (`Home`).
 - Style configuration with color parsing.
-- Environment variable overrides (`DAILY_DASHBOARD_CONFIG`, `DAILY_DASHBOARD_DATA`).
+- Environment variable overrides (`DAILY_DASHBOARD_CONFIG`, `DAILY_DASHBOARD_DATA`, `DAILY_DASHBOARD_IMAGE_PROTOCOL`).
 
 Default keybindings (config-driven, global):
 
@@ -196,16 +207,18 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
 
 - **News**: `i` / `Up` — move selection up · `j` / `Down` — move selection down · `Enter` — open the selected article in the default browser.
 - **Dictionary**: `Esc` — enter editing mode (or leave it) · type to edit · `Enter` — look up the word. While editing, the Dictionary consumes all keypresses so News doesn't react.
+- **Daily Picture**: `Shift+N` — fetch a new random photo.
 
 ## Data Sources & APIs
 
-| Widget      | Source                                                                   | Notes                                                                                 |
-| ----------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Weather     | [Open-Meteo](https://open-meteo.com/)                                    | No API key. Current conditions + 7-day forecast.                                      |
-| Location    | Public IP (ipify / ifconfig.me / icanhazip) → `ipgeolocate` (ip-api.com) | IP tried from multiple endpoints; geolocation via the `ipgeolocate` crate.            |
-| Inspiration | [ZenQuotes](https://zenquotes.io/api/today)                              | Daily quote (`q` text, `a` author).                                                   |
-| Dictionary  | [Free Dictionary API](https://api.dictionaryapi.dev/api/v2/entries/en)   | Word → phonetic + meanings/definitions. 404 on unknown words is surfaced as an error. |
-| News        | [ok.surf](https://ok.surf/api/v1/cors/news-feed)                         | Business, Technology, Sports, Politics, Health, Entertainment.                        |
+| Widget        | Source                                                                   | Notes                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Weather       | [Open-Meteo](https://open-meteo.com/)                                    | No API key. Current conditions + 7-day forecast.                                                                                         |
+| Location      | Public IP (ipify / ifconfig.me / icanhazip) → `ipgeolocate` (ip-api.com) | IP tried from multiple endpoints; geolocation via the `ipgeolocate` crate.                                                               |
+| Inspiration   | [ZenQuotes](https://zenquotes.io/api/today)                              | Daily quote (`q` text, `a` author).                                                                                                      |
+| Dictionary    | [Free Dictionary API](https://api.dictionaryapi.dev/api/v2/entries/en)   | Word → phonetic + meanings/definitions. 404 on unknown words is surfaced as an error.                                                    |
+| News          | [ok.surf](https://ok.surf/api/v1/cors/news-feed)                         | Business, Technology, Sports, Politics, Health, Entertainment.                                                                           |
+| Daily Picture | [Lorem Picsum](https://picsum.photos)                                    | No API key, no rate limit. Random photo from `/<w>/<h>` (a different image per request); fetched on startup and on-demand via `Shift+N`. |
 
 ## Testing Notes
 
@@ -214,7 +227,9 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
   - `news::parse_articles` — category ordering, missing-field skipping, per-category cap, unknown/empty categories.
   - `weather::parse_daily_forecast` — weekday/temp extraction, missing `daily`, bad dates, partial arrays.
   - `dictionary::parse_entry` and `dictionary::build_definition_text` — word/phonetic/meaning extraction, phonetics-array fallback, empty-meaning skipping, rendered text.
+  - `picture_frame::image_url` and `picture_frame::is_new_image_key` — Lorem Picsum random-URL construction, and the Shift+N (uppercase `N`) key detection that ignores lowercase `n` and `Ctrl`/`Ctrl+Shift` combos.
 - **Render snapshot tests** use `ratatui::backend::TestBackend` + `Terminal` to draw a widget into a buffer and assert on the visible text (see `src/tests/inspiration.rs`).
+- **HTTP helper tests** (`src/tests/http.rs`) exercise `http::shared_client`, `get_text`, `get_json`, and `get_bytes_redirected` against a tiny in-process HTTP/1.1 server bound to an ephemeral localhost port (no external network, so they run in the default hermetic suite). Covers 200/404 response handling, JSON parse success/failure, and redirect-following with final-URL capture.
 - **Live-network tests** are marked `#[ignore]` so the default suite is hermetic; run them with `cargo test -- --ignored`.
 - Lint and doc gates are strict: `clippy --all-targets -- -D warnings` and `cargo doc --document-private-items` with `RUSTDOCFLAGS=-D warnings`.
 
