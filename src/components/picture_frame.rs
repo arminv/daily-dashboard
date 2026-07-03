@@ -18,16 +18,16 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 use tracing::{error, info, warn};
 
-const PICSUM_BASE: &str = "https://picsum.photos";
-const PICSUM_WIDTH: u32 = 1200;
-const PICSUM_HEIGHT: u32 = 800;
+const PICSUM_BASE_URL: &str = "https://picsum.photos";
+const PICSUM_WIDTH_PX: u32 = 1200;
+const PICSUM_HEIGHT_PX: u32 = 800;
 
 #[derive(Debug, Default)]
 pub struct ImageState {
     pub loading_status: LoadingStatus,
     pub pending_image: Option<DynamicImage>,
-    pub in_flight: bool,
-    pub refetch_requested: bool,
+    pub is_in_flight: bool,
+    pub is_refetch_requested: bool,
 }
 
 pub struct PictureFrame {
@@ -87,16 +87,16 @@ impl PictureFrame {
             let state = self.state.read().unwrap();
             // A fetch is already running: a pending manual request stays set and
             // is honored once the current fetch finishes.
-            !state.in_flight
-                && (state.refetch_requested
+            !state.is_in_flight
+                && (state.is_refetch_requested
                     || matches!(state.loading_status, LoadingStatus::NotStarted))
         };
 
         if should_spawn {
             {
                 let mut state = self.state.write().unwrap();
-                state.in_flight = true;
-                state.refetch_requested = false;
+                state.is_in_flight = true;
+                state.is_refetch_requested = false;
                 if matches!(state.loading_status, LoadingStatus::NotStarted) {
                     state.loading_status = LoadingStatus::Loading;
                 }
@@ -123,6 +123,8 @@ impl PictureFrame {
         }
     }
 
+    /// Install the pending image into the protocol. Called from `update()` (i.e.
+    /// between renders), so the expensive encode never blocks `draw()`.
     fn install_pending_image(&mut self) {
         let pending = self.state.write().unwrap().pending_image.take();
         if let Some(image) = pending {
@@ -134,10 +136,10 @@ impl PictureFrame {
 
 impl Component for PictureFrame {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        // Shift+N requests a fresh random photo. The actual spawn happens on the
+        // Requests a fresh random photo. The actual spawn happens on the
         // next tick in `maybe_spawn_fetch`.
         if is_new_image_key(&key) {
-            self.state.write().unwrap().refetch_requested = true;
+            self.state.write().unwrap().is_refetch_requested = true;
         }
         Ok(None)
     }
@@ -157,15 +159,12 @@ impl Component for PictureFrame {
         if let LoadingStatus::Loaded = &status {
             let block = theme::frame_block("🖼  Daily Picture");
             let inner = block.inner(area);
+            let widget = StatefulImage::new().resize(Resize::Fit(None));
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(1), Constraint::Length(2)])
                 .split(inner);
-            frame.render_stateful_widget(
-                StatefulImage::new().resize(Resize::Fit(None)),
-                chunks[0],
-                &mut self.protocol,
-            );
+            frame.render_stateful_widget(widget, chunks[0], &mut self.protocol);
             frame.render_widget(hint_paragraph(), chunks[1]);
             frame.render_widget(block, area);
             return Ok(());
@@ -204,11 +203,12 @@ fn force_protocol(protocol_type: ProtocolType) -> Picker {
 }
 
 /// Auto-detect the font size via `from_query_stdio`, then override the protocol
-/// from `TERM_PROGRAM` for well-known terminals whose capability query lies.
+/// from `TERM_PROGRAM` for well-known terminals that report misleading graphics
+/// capabilities.
 ///
 /// The IO query can misdetect Kitty: iTerm2 answers it but only renders its own
 /// protocol, and Warp implements Kitty *graphics* but not Kitty Unicode
-/// placeholders (so `Resize::Fit` would emit `[?]` tofu) — both render fine via
+/// placeholders (so `Resize::Fit` would emit `[?]` tofu) - both render fine via
 /// iTerm2 (OSC 1337), so we force iTerm2 there. Trusting `TERM_PROGRAM` for
 /// these is more reliable than the query.
 fn auto_picker() -> Picker {
@@ -265,7 +265,7 @@ fn auto_picker() -> Picker {
 fn record_error(state: &Arc<RwLock<ImageState>>, message: String) {
     error!("{message}");
     let mut state = state.write().unwrap();
-    state.in_flight = false;
+    state.is_in_flight = false;
     if !matches!(state.loading_status, LoadingStatus::Loaded) {
         state.loading_status = LoadingStatus::Error(message);
     }
@@ -292,18 +292,25 @@ async fn fetch_image(client: reqwest::Client, state: Arc<RwLock<ImageState>>) {
 
     let mut state = state.write().unwrap();
     state.pending_image = Some(image);
-    state.in_flight = false;
+    state.is_in_flight = false;
     state.loading_status = LoadingStatus::Loaded;
 }
 
 pub(crate) fn image_url() -> String {
-    format!("{PICSUM_BASE}/{PICSUM_WIDTH}/{PICSUM_HEIGHT}")
+    format!("{PICSUM_BASE_URL}/{PICSUM_WIDTH_PX}/{PICSUM_HEIGHT_PX}")
 }
 
-/// Does this key event request a new image (Shift+N)? Matches the uppercase `N`
-/// character, which is exactly what Shift+N produces - so a plain lowercase `n`
-/// (and any `Ctrl`/`Ctrl+Shift` combo, which terminals report as lowercase
-/// `Ctrl+n`) is ignored. Pure (no I/O) so it can be unit-tested.
+/// Does this key event request a new image (Shift+N)?
+///
+/// We run in legacy terminal mode (the app never enables the Kitty keyboard
+/// protocol), where there is no separate "shift" bit on the wire: Shift+n is
+/// transmitted *as* the uppercase character `N`. crossterm even derives
+/// `KeyModifiers::SHIFT` from that uppercase-ness, so matching the char is the
+/// semantic check - also testing the modifier would just re-test the same thing.
+/// A plain lowercase `n`, and any `Ctrl`/`Ctrl+Shift` combo (which arrives as a
+/// control byte, i.e. lowercase `Ctrl+n`), are correctly ignored. The only
+/// ambiguity is that Caps Lock + `n` also yields `N`, which is harmless here.
+/// Pure (no I/O) so it can be unit-tested.
 pub(crate) fn is_new_image_key(key: &KeyEvent) -> bool {
     key.code == KeyCode::Char('N')
 }
