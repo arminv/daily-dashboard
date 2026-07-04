@@ -1,12 +1,22 @@
 use color_eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::event::{
+    KeyEvent,
+    MouseEvent,
+};
 use ratatui::{
     Frame,
-    layout::{Rect, Size},
+    layout::{
+        Rect,
+        Size,
+    },
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::Action, config::Config, tui::Event};
+use crate::{
+    action::Action,
+    config::Config,
+    tui::Event,
+};
 
 pub mod calendar;
 pub mod dictionary;

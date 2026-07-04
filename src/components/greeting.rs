@@ -1,14 +1,30 @@
 use super::Component;
-use crate::{app::LoadingStatus, http, theme};
+use crate::{
+    app::LoadingStatus,
+    http,
+    theme,
+};
 use chrono::Local;
 use color_eyre::Result;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{
+        Constraint,
+        Direction,
+        Layout,
+        Rect,
+    },
+    style::{
+        Color,
+        Modifier,
+        Style,
+    },
     widgets::Paragraph,
 };
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use tracing::error;
 
 const IP_API_URLS: [&str; 3] = [

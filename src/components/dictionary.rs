@@ -1,16 +1,46 @@
-use crate::{action::Action, app::LoadingStatus, components::Component, http, theme, tui::Event};
+use crate::{
+    action::Action,
+    app::LoadingStatus,
+    components::Component,
+    http,
+    theme,
+    tui::Event,
+};
 use chrono::Local;
 use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Paragraph, Wrap},
+    layout::{
+        Constraint,
+        Direction,
+        Layout,
+        Rect,
+    },
+    style::{
+        Color,
+        Modifier,
+        Style,
+    },
+    text::{
+        Line,
+        Span,
+        Text,
+    },
+    widgets::{
+        Block,
+        Paragraph,
+        Wrap,
+    },
 };
 use ratatui_textarea::TextArea;
-use std::sync::{Arc, RwLock};
-use tracing::{error, info};
+use std::sync::{
+    Arc,
+    RwLock,
+};
+use tracing::{
+    error,
+    info,
+};
 
 const DICTIONARY_API_URL: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
 

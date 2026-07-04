@@ -23,7 +23,11 @@ pub fn init() -> Result<()> {
 
         #[cfg(not(debug_assertions))]
         {
-            use human_panic::{handle_dump, metadata, print_msg};
+            use human_panic::{
+                handle_dump,
+                metadata,
+                print_msg,
+            };
             let metadata = metadata!();
             let file_path = handle_dump(&metadata, panic_info);
             // prints human-panic message

@@ -1,14 +1,36 @@
-use crate::{action::Action, app::LoadingStatus, components::Component, http, theme, tui::Event};
+use crate::{
+    action::Action,
+    app::LoadingStatus,
+    components::Component,
+    http,
+    theme,
+    tui::Event,
+};
 use chrono::Local;
 use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Cell, Row, Table, TableState},
+    style::{
+        Color,
+        Modifier,
+        Style,
+    },
+    text::{
+        Line,
+        Span,
+    },
+    widgets::{
+        Cell,
+        Row,
+        Table,
+        TableState,
+    },
 };
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use tracing::error;
 
 const NEWS_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";

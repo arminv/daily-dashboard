@@ -1,5 +1,8 @@
 use super::*;
-use ratatui::{Terminal, backend::TestBackend};
+use ratatui::{
+    Terminal,
+    backend::TestBackend,
+};
 
 /// Render `widget` into a fresh test buffer and return the joined cell symbols
 /// so tests can assert on the visible text without pinning exact spacing.

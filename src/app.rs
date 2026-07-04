@@ -1,7 +1,10 @@
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tokio::sync::mpsc;
 use tracing::debug;
 
@@ -11,7 +14,10 @@ use crate::{
     config::Config,
     dashboard::Dashboard,
     http,
-    tui::{Event, Tui},
+    tui::{
+        Event,
+        Tui,
+    },
 };
 
 pub struct App {

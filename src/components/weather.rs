@@ -1,10 +1,28 @@
-use super::{Component, greeting::GreetingState};
-use crate::{action::Action, app::LoadingStatus, http, theme};
-use chrono::{Datelike, Local, NaiveDate};
+use super::{
+    Component,
+    greeting::GreetingState,
+};
+use crate::{
+    action::Action,
+    app::LoadingStatus,
+    http,
+    theme,
+};
+use chrono::{
+    Datelike,
+    Local,
+    NaiveDate,
+};
 use color_eyre::Result;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+    prelude::*,
+    widgets::*,
+};
 use serde_json;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use tracing::error;
 
 #[derive(Clone, Debug, Default)]

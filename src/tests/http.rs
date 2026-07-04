@@ -1,6 +1,14 @@
 use super::*;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::{
+    io::{
+        Read,
+        Write,
+    },
+    net::{
+        TcpListener,
+        TcpStream,
+    },
+};
 
 /// Spawn a tiny single-threaded HTTP/1.1 server on an ephemeral localhost port
 /// and return its base URL (`http://127.0.0.1:<port>`). Each accepted

@@ -1,14 +1,32 @@
 use super::Component;
-use crate::{action::Action, app::LoadingStatus, http, theme};
+use crate::{
+    action::Action,
+    app::LoadingStatus,
+    http,
+    theme,
+};
 use color_eyre::Result;
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Paragraph, Wrap},
+    style::{
+        Color,
+        Modifier,
+        Style,
+    },
+    text::{
+        Line,
+        Span,
+    },
+    widgets::{
+        Paragraph,
+        Wrap,
+    },
 };
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use tracing::error;
 
 const QUOTE_API_URL: &str = "https://zenquotes.io/api/today";

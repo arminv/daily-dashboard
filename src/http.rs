@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use color_eyre::{Result, eyre::WrapErr};
+use color_eyre::{
+    Result,
+    eyre::WrapErr,
+};
 use serde_json::Value;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);

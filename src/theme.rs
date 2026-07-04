@@ -1,7 +1,13 @@
 use ratatui::{
-    style::{Color, Style},
+    style::{
+        Color,
+        Style,
+    },
     text::Line,
-    widgets::{Block, Borders},
+    widgets::{
+        Block,
+        Borders,
+    },
 };
 
 /// Primary accent color used for panel borders and titles throughout the app.

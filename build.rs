@@ -1,5 +1,10 @@
 use anyhow::Result;
-use vergen_gix::{Build, Cargo, Emitter, Gix};
+use vergen_gix::{
+    Build,
+    Cargo,
+    Emitter,
+    Gix,
+};
 
 fn main() -> Result<()> {
     let build = Build::all_build();

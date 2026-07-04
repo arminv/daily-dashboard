@@ -1,17 +1,38 @@
 #![allow(dead_code)] // Remove this once you start using the code
 
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    path::PathBuf,
+};
 
 use color_eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use derive_deref::{Deref, DerefMut};
+use crossterm::event::{
+    KeyCode,
+    KeyEvent,
+    KeyModifiers,
+};
+use derive_deref::{
+    Deref,
+    DerefMut,
+};
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
-use ratatui::style::{Color, Modifier, Style};
-use serde::{Deserialize, de::Deserializer};
+use ratatui::style::{
+    Color,
+    Modifier,
+    Style,
+};
+use serde::{
+    Deserialize,
+    de::Deserializer,
+};
 use tracing::error;
 
-use crate::{action::Action, app::Mode};
+use crate::{
+    action::Action,
+    app::Mode,
+};
 
 const CONFIG: &str = include_str!("../.config/config.json5");
 

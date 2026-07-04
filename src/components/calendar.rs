@@ -3,8 +3,14 @@ use color_eyre::Result;
 use ratatui::{
     Frame,
     layout::Rect,
-    prelude::{Color, Style},
-    widgets::calendar::{CalendarEventStore, Monthly},
+    prelude::{
+        Color,
+        Style,
+    },
+    widgets::calendar::{
+        CalendarEventStore,
+        Monthly,
+    },
 };
 use time::OffsetDateTime;
 

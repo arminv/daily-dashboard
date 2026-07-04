@@ -1,22 +1,55 @@
 use super::Component;
-use crate::{action::Action, app::LoadingStatus, http, theme};
+use crate::{
+    action::Action,
+    app::LoadingStatus,
+    http,
+    theme,
+};
 use color_eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{
+    KeyCode,
+    KeyEvent,
+};
 use image::DynamicImage;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{
+        Constraint,
+        Direction,
+        Layout,
+        Rect,
+    },
     style::Style,
-    widgets::{Paragraph, Wrap},
+    widgets::{
+        Paragraph,
+        Wrap,
+    },
 };
 use ratatui_image::{
-    Resize, StatefulImage,
-    picker::{Picker, ProtocolType},
-    thread::{ResizeRequest, ThreadProtocol},
+    Resize,
+    StatefulImage,
+    picker::{
+        Picker,
+        ProtocolType,
+    },
+    thread::{
+        ResizeRequest,
+        ThreadProtocol,
+    },
 };
-use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
-use tracing::{error, info, warn};
+use std::sync::{
+    Arc,
+    RwLock,
+};
+use tokio::sync::mpsc::{
+    UnboundedReceiver,
+    unbounded_channel,
+};
+use tracing::{
+    error,
+    info,
+    warn,
+};
 
 const PICSUM_BASE_URL: &str = "https://picsum.photos";
 const PICSUM_WIDTH_PX: u32 = 1200;
@@ -80,13 +113,9 @@ impl PictureFrame {
         }
     }
 
-    /// Spawn a fetch if one isn't already running and a fresh image is warranted:
-    /// the initial startup load, or a manual `Shift+N` refresh.
     fn maybe_spawn_fetch(&mut self) {
         let should_spawn = {
             let state = self.state.read().unwrap();
-            // A fetch is already running: a pending manual request stays set and
-            // is honored once the current fetch finishes.
             !state.is_in_flight
                 && (state.is_refetch_requested
                     || matches!(state.loading_status, LoadingStatus::NotStarted))
@@ -136,8 +165,6 @@ impl PictureFrame {
 
 impl Component for PictureFrame {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        // Requests a fresh random photo. The actual spawn happens on the
-        // next tick in `maybe_spawn_fetch`.
         if is_new_image_key(&key) {
             self.state.write().unwrap().is_refetch_requested = true;
         }

@@ -2,7 +2,10 @@ use crate::{
     action::Action,
     components::{
         Component,
-        calendar::{Calendar, MONTHLY_WIDTH},
+        calendar::{
+            Calendar,
+            MONTHLY_WIDTH,
+        },
         dictionary::Dictionary,
         greeting::Greeting,
         inspiration::Inspiration,
@@ -13,10 +16,20 @@ use crate::{
     config::Config,
     theme,
 };
-use color_eyre::{Result, eyre::Ok};
+use color_eyre::{
+    Result,
+    eyre::Ok,
+};
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Flex, Layout, Rect, Size},
+    layout::{
+        Constraint,
+        Direction,
+        Flex,
+        Layout,
+        Rect,
+        Size,
+    },
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -68,7 +81,8 @@ impl Dashboard {
 }
 
 impl Component for Dashboard {
-    // Since Dashboard is the only officially registered/orchestrator component, we need to pass along events, updates, etc. to child components
+    // Since Dashboard is the only officially registered/orchestrator component, we need to pass
+    // along events, updates, etc. to child components
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         for component in self.components() {
             component.register_action_handler(tx.clone())?;
