@@ -29,6 +29,7 @@ pub struct Weather {
 }
 
 const REFETCH_WEATHER_IN_MINS: i64 = 10;
+const RETRY_WEATHER_ON_ERROR_IN_MINS: i64 = 1;
 
 impl Weather {
     pub fn new(client: reqwest::Client, greeting_state: Arc<RwLock<GreetingState>>) -> Self {
@@ -42,6 +43,12 @@ impl Weather {
     fn set_loading_state(&self, status: LoadingStatus) {
         let mut state = self.state.write().unwrap();
         state.loading_status = status;
+    }
+
+    fn set_error_state(&self, message: String) {
+        let mut state = self.state.write().unwrap();
+        state.loading_status = LoadingStatus::Error(message);
+        state.last_updated_at = Some(Local::now());
     }
 
     fn get_weather_description(&self, code: u32) -> String {
@@ -104,7 +111,7 @@ impl Weather {
             Err(e) => {
                 let error_msg = format!("Weather: {e}");
                 error!("{error_msg}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_error_state(error_msg);
                 return;
             }
         };
@@ -114,7 +121,7 @@ impl Weather {
             None => {
                 let error_msg = "No 'current' field in response".to_string();
                 error!("Weather: {}", error_msg);
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_error_state(error_msg);
                 return;
             }
         };
@@ -222,23 +229,22 @@ impl Component for Weather {
             let should_fetch = {
                 let weather_state = self.state.read().unwrap();
                 let greeting_state = self.greeting_state.read().unwrap();
-                let is_location_ready =
-                    matches!(greeting_state.loading_status, LoadingStatus::Loaded);
-                let is_initial_load = matches!(
-                    weather_state.loading_status,
-                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                );
-                let now = Local::now();
-                let should_refresh = match weather_state.last_updated_at {
-                    Some(last_updated) => {
-                        let duration = now.signed_duration_since(last_updated);
-                        // Refresh if more than N minutes have passed
-                        duration.num_minutes() >= REFETCH_WEATHER_IN_MINS
-                    }
-                    None => true,
-                };
 
-                is_location_ready && (is_initial_load || should_refresh)
+                if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
+                    false
+                } else {
+                    let is_stale = |mins: i64| {
+                        weather_state.last_updated_at.is_none_or(|last| {
+                            Local::now().signed_duration_since(last).num_minutes() >= mins
+                        })
+                    };
+                    match weather_state.loading_status {
+                        LoadingStatus::NotStarted => true,
+                        LoadingStatus::Loading => false,
+                        LoadingStatus::Loaded => is_stale(REFETCH_WEATHER_IN_MINS),
+                        LoadingStatus::Error(_) => is_stale(RETRY_WEATHER_ON_ERROR_IN_MINS),
+                    }
+                }
             };
 
             if should_fetch {
