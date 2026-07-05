@@ -1,10 +1,9 @@
-use std::time::Duration;
-
 use color_eyre::{
     Result,
     eyre::WrapErr,
 };
 use serde_json::Value;
+use std::time::Duration;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const USER_AGENT: &str = concat!("daily-dashboard/", env!("CARGO_PKG_VERSION"));
