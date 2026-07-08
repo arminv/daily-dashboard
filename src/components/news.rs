@@ -221,8 +221,8 @@ impl Component for News {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        let mut news_state_lock = self.state.lock().unwrap();
-        match &news_state_lock.loading_status {
+        let mut news_state = self.state.lock().unwrap();
+        match &news_state.loading_status {
             LoadingStatus::NotStarted => {
                 frame.render_widget(theme::panel_block("📰 News"), area);
             }
@@ -236,14 +236,14 @@ impl Component for News {
                 );
             }
             LoadingStatus::Loaded => {
-                let last_updated = news_state_lock
+                let last_updated = news_state
                     .last_updated_at
                     .map(|dt| dt.format("%H:%M").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
 
                 let title = format!(
                     "📰 News ({} articles) · Updated: {}",
-                    news_state_lock.news_articles.len(),
+                    news_state.news_articles.len(),
                     last_updated
                 );
 
@@ -267,8 +267,8 @@ impl Component for News {
                 // Read the selection from the guard we already hold; calling a
                 // helper that re-locks `self.state` here would deadlock (Mutex is
                 // not reentrant).
-                let selected = news_state_lock.table_state.selected();
-                let rows: Vec<Row> = news_state_lock
+                let selected = news_state.table_state.selected();
+                let rows: Vec<Row> = news_state
                     .news_articles
                     .iter()
                     .enumerate()
@@ -303,7 +303,7 @@ impl Component for News {
                 .row_highlight_style(Style::default().bg(Color::White))
                 .highlight_symbol("📌 ");
 
-                frame.render_stateful_widget(table, area, &mut news_state_lock.table_state);
+                frame.render_stateful_widget(table, area, &mut news_state.table_state);
             }
         }
         Ok(())

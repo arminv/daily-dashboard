@@ -146,9 +146,9 @@ impl Component for Inspiration {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let inspiration_state_read = self.state.lock().unwrap();
+        let inspiration_state = self.state.lock().unwrap();
 
-        match &inspiration_state_read.loading_status {
+        match &inspiration_state.loading_status {
             LoadingStatus::NotStarted => render_status(
                 frame,
                 area,
@@ -177,24 +177,22 @@ impl Component for Inspiration {
                 let quote_line = Line::from(vec![
                     Span::styled("❝", Style::default().fg(theme::ACCENT)),
                     Span::styled(
-                        inspiration_state_read.quote_text.clone(),
+                        inspiration_state.quote_text.clone(),
                         Style::default()
                             .fg(Color::White)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled("❞", Style::default().fg(theme::ACCENT)),
                 ]);
-
                 let author_line = Line::from(vec![
                     Span::styled("— ", Style::default().fg(theme::HINT)),
                     Span::styled(
-                        inspiration_state_read.quote_author.clone(),
+                        inspiration_state.quote_author.clone(),
                         Style::default()
                             .fg(theme::HINT)
                             .add_modifier(Modifier::ITALIC),
                     ),
                 ]);
-
                 let paragraph = Paragraph::new(vec![quote_line, author_line])
                     .block(theme::panel_block("✨ Daily Quote"))
                     .style(Style::new().cyan())
