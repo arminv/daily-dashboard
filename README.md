@@ -61,7 +61,7 @@ Keybindings are configurable in `config.json5` (see `.config/config.json5`).
 
 | Widget        | Source                                           | Refresh             |
 | ------------- | ------------------------------------------------ | ------------------- |
-| Greeting      | Public IP + `ipgeolocate` (ip-api.com)           | Once                |
+| Greeting      | Public IP + [ip-api.com](https://ip-api.com)     | Once                |
 | Weather       | [Open-Meteo](https://open-meteo.com)             | 10 minutes          |
 | Inspiration   | [ZenQuotes](https://zenquotes.io)                | Daily               |
 | Dictionary    | [Free Dictionary API](https://dictionaryapi.dev) | On demand           |

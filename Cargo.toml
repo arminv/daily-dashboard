@@ -42,7 +42,6 @@ strip-ansi-escapes = "0.2.0"
 strum = { version = "0.28.0", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["full"] }
 reqwest = { version = "0.13.4", features = ["json"] }
-ipgeolocate = "0.3"
 tokio-util = "0.7.12"
 tracing = "0.1.40"
 tracing-error = "0.2.0"

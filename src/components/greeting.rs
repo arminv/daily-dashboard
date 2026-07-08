@@ -32,6 +32,8 @@ const IP_API_URLS: [&str; 3] = [
     "https://ifconfig.me/ip",
     "https://icanhazip.com",
 ];
+const GEO_API_URL: &str =
+    "http://ip-api.com/json/{ip}?fields=status,message,city,country,lat,lon,timezone";
 
 #[derive(Debug, Clone, Default)]
 pub struct LocationState {
@@ -79,34 +81,36 @@ impl Greeting {
     async fn fetch_location_data(&self) {
         self.set_loading_state(LoadingStatus::Loading);
 
-        match self.get_public_ip().await {
-            Ok(ip) => {
-                let service = ipgeolocate::Service::IpApi;
-
-                match ipgeolocate::Locator::get(&ip, service).await {
-                    Ok(ip_info) => {
-                        let location_data = LocationState {
-                            city: ip_info.city,
-                            country: ip_info.country,
-                            latitude: ip_info.latitude.parse().unwrap_or(0.0),
-                            longitude: ip_info.longitude.parse().unwrap_or(0.0),
-                            timezone: ip_info.timezone,
-                        };
-                        let mut state = self.state.lock().unwrap();
-                        state.location = location_data;
-                        state.loading_status = LoadingStatus::Loaded;
-                    }
-                    Err(error) => {
-                        error!("Error fetching IP location: {}", error);
-                        self.set_loading_state(LoadingStatus::Error(error.to_string()));
-                    }
-                }
-            }
+        let ip = match self.get_public_ip().await {
+            Ok(ip) => ip,
             Err(error) => {
-                error!("Error fetching public IP: {}", error);
+                error!("Error fetching public IP: {error}");
                 self.set_loading_state(LoadingStatus::Error(format!(
                     "Failed to get public IP: {error}",
                 )));
+                return;
+            }
+        };
+
+        let url = GEO_API_URL.replace("{ip}", &ip);
+        let json = match http::get_json(&self.client, &url).await {
+            Ok(json) => json,
+            Err(error) => {
+                error!("Error fetching IP location: {error}");
+                self.set_loading_state(LoadingStatus::Error(error.to_string()));
+                return;
+            }
+        };
+
+        match parse_location(&json) {
+            Ok(location_data) => {
+                let mut state = self.state.lock().unwrap();
+                state.location = location_data;
+                state.loading_status = LoadingStatus::Loaded;
+            }
+            Err(error) => {
+                error!("Error parsing IP location: {error}");
+                self.set_loading_state(LoadingStatus::Error(error));
             }
         }
     }
@@ -180,3 +184,40 @@ impl Component for Greeting {
         Ok(())
     }
 }
+
+/// Parse an ip-api.com JSON response into [`LocationState`]. Pure (no I/O) so
+/// it can be unit-tested.
+fn parse_location(json: &serde_json::Value) -> Result<LocationState, String> {
+    let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    if status != "success" {
+        let message = json
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown error");
+        return Err(format!("ip-api lookup failed: {message}"));
+    }
+
+    Ok(LocationState {
+        city: json
+            .get("city")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        country: json
+            .get("country")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        latitude: json.get("lat").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        longitude: json.get("lon").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        timezone: json
+            .get("timezone")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+    })
+}
+
+#[cfg(test)]
+#[path = "../tests/greeting.rs"]
+mod tests;

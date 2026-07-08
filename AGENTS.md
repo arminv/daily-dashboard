@@ -148,7 +148,7 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 
 - `src/http.rs` builds one shared `reqwest::Client` (10s timeout, `daily-dashboard/<version>` user-agent, pooled connections). Cloning a `Client` is cheap, so the single client is cloned into each fetching widget instead of being rebuilt per request.
 - `http::get_json(url)`, `http::get_text(url)`, and `http::get_bytes_redirected(url)` handle the GET → `error_for_status` → body decode → JSON / text / raw bytes ladder, returning `color_eyre::Result`. Every widget fetch (greeting, weather, news, inspiration, dictionary) goes through these helpers; the Daily Picture widget uses `get_bytes_redirected` for the image file and decodes it with `image::load_from_memory`.
-- IP **geolocation** still uses the `ipgeolocate` crate (`ip-api.com`) directly, separate from the `http` helpers.
+- IP **geolocation** uses the free [ip-api.com](https://ip-api.com/) JSON endpoint via `http::get_json` (after resolving the public IP from ipify / ifconfig.me / icanhazip).
 
 ### Theming
 
@@ -180,7 +180,6 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - **config** 0.15.23 — layered configuration with JSON5 support
 - **color-eyre** 0.6.3 — error reporting (the app standardizes on `color_eyre::Result`)
 - **tracing** 0.1.40 / **tracing-subscriber** — structured logging
-- **ipgeolocate** 0.3 — IP-based geolocation via ip-api.com
 - **chrono** 0.4 / **time** 0.3.41 — date/time handling
 - **open** 5.0 — open URLs in the default browser (News)
 - **whoami** 2.1.2 — current username (Greeting)
@@ -211,14 +210,14 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
 
 ## Data Sources & APIs
 
-| Widget        | Source                                                                   | Notes                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Weather       | [Open-Meteo](https://open-meteo.com/)                                    | No API key. Current conditions + 7-day forecast.                                                                                         |
-| Location      | Public IP (ipify / ifconfig.me / icanhazip) → `ipgeolocate` (ip-api.com) | IP tried from multiple endpoints; geolocation via the `ipgeolocate` crate.                                                               |
-| Inspiration   | [ZenQuotes](https://zenquotes.io/api/today)                              | Daily quote (`q` text, `a` author).                                                                                                      |
-| Dictionary    | [Free Dictionary API](https://api.dictionaryapi.dev/api/v2/entries/en)   | Word → phonetic + meanings/definitions. 404 on unknown words is surfaced as an error.                                                    |
-| News          | [ok.surf](https://ok.surf/api/v1/cors/news-feed)                         | Business, Technology, Sports, Politics, Health, Entertainment.                                                                           |
-| Daily Picture | [Lorem Picsum](https://picsum.photos)                                    | No API key, no rate limit. Random photo from `/<w>/<h>` (a different image per request); fetched on startup and on-demand via `Shift+N`. |
+| Widget        | Source                                                                          | Notes                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Weather       | [Open-Meteo](https://open-meteo.com/)                                           | No API key. Current conditions + 7-day forecast.                                                                                         |
+| Location      | Public IP (ipify / ifconfig.me / icanhazip) → [ip-api.com](https://ip-api.com/) | IP tried from multiple endpoints; geolocation via `http::get_json` to ip-api.                                                            |
+| Inspiration   | [ZenQuotes](https://zenquotes.io/api/today)                                     | Daily quote (`q` text, `a` author).                                                                                                      |
+| Dictionary    | [Free Dictionary API](https://api.dictionaryapi.dev/api/v2/entries/en)          | Word → phonetic + meanings/definitions. 404 on unknown words is surfaced as an error.                                                    |
+| News          | [ok.surf](https://ok.surf/api/v1/cors/news-feed)                                | Business, Technology, Sports, Politics, Health, Entertainment.                                                                           |
+| Daily Picture | [Lorem Picsum](https://picsum.photos)                                           | No API key, no rate limit. Random photo from `/<w>/<h>` (a different image per request); fetched on startup and on-demand via `Shift+N`. |
 
 ## Testing Notes
 
@@ -227,6 +226,7 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
   - `news::parse_articles` — category ordering, missing-field skipping, per-category cap, unknown/empty categories.
   - `weather::parse_daily_forecast` — weekday/temp extraction, missing `daily`, bad dates, partial arrays.
   - `dictionary::parse_entry` and `dictionary::build_definition_text` — word/phonetic/meaning extraction, phonetics-array fallback, empty-meaning skipping, rendered text.
+  - `greeting::parse_location` — ip-api success/fail status handling, field extraction, missing-field defaults.
   - `picture_frame::image_url` and `picture_frame::is_new_image_key` — Lorem Picsum random-URL construction, and the Shift+N (uppercase `N`) key detection that ignores lowercase `n` and `Ctrl`/`Ctrl+Shift` combos.
 - **Render snapshot tests** use `ratatui::backend::TestBackend` + `Terminal` to draw a widget into a buffer and assert on the visible text (see `src/tests/inspiration.rs`).
 - **HTTP helper tests** (`src/tests/http.rs`) exercise `http::shared_client`, `get_text`, `get_json`, and `get_bytes_redirected` against a tiny in-process HTTP/1.1 server bound to an ephemeral localhost port (no external network, so they run in the default hermetic suite). Covers 200/404 response handling, JSON parse success/failure, and redirect-following with final-URL capture.
