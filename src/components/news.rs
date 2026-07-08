@@ -29,7 +29,7 @@ use ratatui::{
 };
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tracing::error;
 
@@ -64,7 +64,7 @@ pub struct NewsState {
 
 #[derive(Clone, Debug)]
 pub struct News {
-    state: Arc<RwLock<NewsState>>,
+    state: Arc<Mutex<NewsState>>,
     client: reqwest::Client,
 }
 
@@ -74,7 +74,7 @@ impl News {
         table_state.select(Some(0)); // Have the first article always selected
 
         Self {
-            state: Arc::new(RwLock::new(NewsState {
+            state: Arc::new(Mutex::new(NewsState {
                 table_state,
                 ..Default::default()
             })),
@@ -83,12 +83,12 @@ impl News {
     }
 
     fn set_loading_state(&self, status: LoadingStatus) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.loading_status = status;
     }
 
     fn move_selection(&self, delta: i32) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         let len = state.news_articles.len();
         if len == 0 {
             return;
@@ -120,21 +120,10 @@ impl News {
             return;
         }
 
-        let mut news_state = self.state.write().unwrap();
+        let mut news_state = self.state.lock().unwrap();
         news_state.news_articles = articles;
         news_state.last_updated_at = Some(Local::now());
         news_state.loading_status = LoadingStatus::Loaded;
-    }
-
-    fn get_selected_row_fg_color(&self, idx: usize) -> Style {
-        let news_state = self.state.read().unwrap();
-        let mut selected_color = Style::default().fg(Color::White);
-        if let Some(selected_idx) = news_state.table_state.selected()
-            && selected_idx == idx
-        {
-            selected_color = Style::default().fg(Color::Black);
-        };
-        selected_color
     }
 }
 
@@ -186,7 +175,7 @@ impl Component for News {
                 KeyCode::Char('i') | KeyCode::Up => self.move_selection(-1),
                 KeyCode::Char('j') | KeyCode::Down => self.move_selection(1),
                 KeyCode::Enter => {
-                    let state = self.state.read().unwrap();
+                    let state = self.state.lock().unwrap();
                     if let Some(selected) = state.table_state.selected()
                         && let Some(article) = state.news_articles.get(selected)
                     {
@@ -205,7 +194,7 @@ impl Component for News {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let news_state = self.state.read().unwrap();
+                let news_state = self.state.lock().unwrap();
                 let is_initial_load = matches!(
                     news_state.loading_status,
                     LoadingStatus::NotStarted | LoadingStatus::Error(_)
@@ -232,8 +221,8 @@ impl Component for News {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> color_eyre::Result<()> {
-        let news_state_read = self.state.read().unwrap();
-        match &news_state_read.loading_status {
+        let mut news_state_lock = self.state.lock().unwrap();
+        match &news_state_lock.loading_status {
             LoadingStatus::NotStarted => {
                 frame.render_widget(theme::panel_block("📰 News"), area);
             }
@@ -247,14 +236,14 @@ impl Component for News {
                 );
             }
             LoadingStatus::Loaded => {
-                let last_updated = news_state_read
+                let last_updated = news_state_lock
                     .last_updated_at
                     .map(|dt| dt.format("%H:%M").to_string())
                     .unwrap_or_else(|| "Unknown".to_string());
 
                 let title = format!(
                     "📰 News ({} articles) · Updated: {}",
-                    news_state_read.news_articles.len(),
+                    news_state_lock.news_articles.len(),
                     last_updated
                 );
 
@@ -275,17 +264,26 @@ impl Component for News {
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
 
-                let rows: Vec<Row> = news_state_read
+                // Read the selection from the guard we already hold; calling a
+                // helper that re-locks `self.state` here would deadlock (Mutex is
+                // not reentrant).
+                let selected = news_state_lock.table_state.selected();
+                let rows: Vec<Row> = news_state_lock
                     .news_articles
                     .iter()
                     .enumerate()
                     .map(|(idx, article)| {
+                        let fg = if selected == Some(idx) {
+                            Color::Black
+                        } else {
+                            Color::White
+                        };
                         Row::new(vec![
                             Cell::from(article.title.clone()),
                             Cell::from(article.source.clone()),
                             Cell::from(article.category.clone()),
                         ])
-                        .style(self.get_selected_row_fg_color(idx))
+                        .style(Style::default().fg(fg))
                         .height(1)
                     })
                     .collect();
@@ -305,9 +303,7 @@ impl Component for News {
                 .row_highlight_style(Style::default().bg(Color::White))
                 .highlight_symbol("📌 ");
 
-                drop(news_state_read); // Release the read lock first
-                let mut table_state_write = self.state.write().unwrap().table_state;
-                frame.render_stateful_widget(table, area, &mut table_state_write);
+                frame.render_stateful_widget(table, area, &mut news_state_lock.table_state);
             }
         }
         Ok(())

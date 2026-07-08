@@ -25,7 +25,7 @@ use ratatui::{
 };
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tracing::error;
 
@@ -40,20 +40,20 @@ pub struct InspirationState {
 
 #[derive(Clone, Debug)]
 pub struct Inspiration {
-    state: Arc<RwLock<InspirationState>>,
+    state: Arc<Mutex<InspirationState>>,
     client: reqwest::Client,
 }
 
 impl Inspiration {
     pub fn new(client: reqwest::Client) -> Self {
         Self {
-            state: Arc::new(RwLock::new(InspirationState::default())),
+            state: Arc::new(Mutex::new(InspirationState::default())),
             client,
         }
     }
 
     fn set_loading_state(&self, status: LoadingStatus) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.loading_status = status;
     }
 
@@ -70,7 +70,7 @@ impl Inspiration {
             }
         };
 
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.quote_text = quote_text;
         state.quote_author = quote_author;
         state.loading_status = LoadingStatus::Loaded;
@@ -127,7 +127,7 @@ impl Component for Inspiration {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let state = self.state.read().unwrap();
+                let state = self.state.lock().unwrap();
                 let is_initial_load = matches!(
                     state.loading_status,
                     LoadingStatus::NotStarted | LoadingStatus::Error(_)
@@ -146,7 +146,7 @@ impl Component for Inspiration {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let inspiration_state_read = self.state.read().unwrap();
+        let inspiration_state_read = self.state.lock().unwrap();
 
         match &inspiration_state_read.loading_status {
             LoadingStatus::NotStarted => render_status(

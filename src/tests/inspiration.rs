@@ -25,7 +25,7 @@ fn render(widget: &mut Inspiration, width: u16, height: u16) -> String {
 fn inspiration_loaded_renders_quote_and_author() {
     let mut widget = Inspiration::new(reqwest::Client::default());
     {
-        let mut state = widget.state.write().unwrap();
+        let mut state = widget.state.lock().unwrap();
         state.quote_text = "Stay hungry, stay foolish.".to_string();
         state.quote_author = "Steve".to_string();
         state.loading_status = LoadingStatus::Loaded;
@@ -49,7 +49,7 @@ fn inspiration_loaded_renders_quote_and_author() {
 #[test]
 fn inspiration_error_renders_message() {
     let mut widget = Inspiration::new(reqwest::Client::default());
-    widget.state.write().unwrap().loading_status = LoadingStatus::Error("boom".to_string());
+    widget.state.lock().unwrap().loading_status = LoadingStatus::Error("boom".to_string());
 
     let rendered = render(&mut widget, 48, 5);
     assert!(

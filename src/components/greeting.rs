@@ -23,7 +23,7 @@ use ratatui::{
 };
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tracing::error;
 
@@ -50,7 +50,7 @@ pub struct GreetingState {
 
 #[derive(Debug, Default, Clone)]
 pub struct Greeting {
-    pub state: Arc<RwLock<GreetingState>>,
+    pub state: Arc<Mutex<GreetingState>>,
     client: reqwest::Client,
 }
 
@@ -72,7 +72,7 @@ impl Greeting {
     }
 
     fn set_loading_state(&self, status: LoadingStatus) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.loading_status = status;
     }
 
@@ -92,7 +92,7 @@ impl Greeting {
                             longitude: ip_info.longitude.parse().unwrap_or(0.0),
                             timezone: ip_info.timezone,
                         };
-                        let mut state = self.state.write().unwrap();
+                        let mut state = self.state.lock().unwrap();
                         state.location = location_data;
                         state.loading_status = LoadingStatus::Loaded;
                     }
@@ -128,7 +128,7 @@ impl Greeting {
     }
 
     fn get_location_display(&self) -> String {
-        let state = self.state.read().unwrap();
+        let state = self.state.lock().unwrap();
         let location_loading = "🌐 Location is loading...".to_string();
 
         match state.loading_status {

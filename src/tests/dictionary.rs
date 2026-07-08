@@ -97,10 +97,10 @@ fn build_definition_text_renders_word_part_of_speech_and_definition() {
 #[tokio::test]
 #[ignore = "hits the live dictionary API"]
 async fn fetch_word_definition_loads_real_word() {
-    let data = Arc::new(RwLock::new(DictionaryData::default()));
+    let data = Arc::new(Mutex::new(DictionaryData::default()));
     fetch_word_definition(data.clone(), "hello".to_string(), test_client()).await;
 
-    let state = data.read().unwrap();
+    let state = data.lock().unwrap();
     assert!(
         matches!(state.loading_status, LoadingStatus::Loaded),
         "expected Loaded, got {:?}",
@@ -120,10 +120,10 @@ async fn fetch_word_definition_loads_real_word() {
 #[tokio::test]
 #[ignore = "hits the live dictionary API"]
 async fn fetch_word_definition_unknown_word_errors() {
-    let data = Arc::new(RwLock::new(DictionaryData::default()));
+    let data = Arc::new(Mutex::new(DictionaryData::default()));
     fetch_word_definition(data.clone(), "asdfqwertyxyz".to_string(), test_client()).await;
 
-    let state = data.read().unwrap();
+    let state = data.lock().unwrap();
     assert!(
         matches!(state.loading_status, LoadingStatus::Error(_)),
         "expected Error, got {:?}",
@@ -134,10 +134,10 @@ async fn fetch_word_definition_unknown_word_errors() {
 #[tokio::test]
 #[ignore = "hits the live dictionary API"]
 async fn fetch_word_definition_samovar_has_meanings() {
-    let data = Arc::new(RwLock::new(DictionaryData::default()));
+    let data = Arc::new(Mutex::new(DictionaryData::default()));
     fetch_word_definition(data.clone(), "samovar".to_string(), test_client()).await;
 
-    let state = data.read().unwrap();
+    let state = data.lock().unwrap();
     assert!(
         matches!(state.loading_status, LoadingStatus::Loaded),
         "expected Loaded, got {:?}",
