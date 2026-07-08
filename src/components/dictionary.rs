@@ -35,7 +35,7 @@ use ratatui::{
 use ratatui_textarea::TextArea;
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tracing::{
     error,
@@ -80,7 +80,7 @@ pub struct DictionaryData {
 }
 
 pub struct Dictionary {
-    data: Arc<RwLock<DictionaryData>>,
+    data: Arc<Mutex<DictionaryData>>,
     // `TextArea` is not `Send`, so it lives outside the shared state.
     input: TextArea<'static>,
     input_mode: InputMode,
@@ -95,7 +95,7 @@ impl Dictionary {
         input.set_placeholder_text("Lookup a word in dictionary...");
 
         Self {
-            data: Arc::new(RwLock::new(DictionaryData::default())),
+            data: Arc::new(Mutex::new(DictionaryData::default())),
             input,
             input_mode: InputMode::Normal,
             client,
@@ -119,7 +119,7 @@ impl Dictionary {
         }
 
         {
-            let mut data = self.data.write().unwrap();
+            let mut data = self.data.lock().unwrap();
             data.search_word = word.clone();
             data.entries.clear();
             data.loading_status = LoadingStatus::Loading;
@@ -155,7 +155,7 @@ impl Dictionary {
     }
 
     fn render_definitions(&self, frame: &mut Frame, area: Rect) {
-        let data = self.data.read().unwrap();
+        let data = self.data.lock().unwrap();
 
         let block = theme::panel_block("📖 Definition");
 
@@ -208,12 +208,12 @@ impl Dictionary {
 }
 
 async fn fetch_word_definition(
-    data: Arc<RwLock<DictionaryData>>,
+    data: Arc<Mutex<DictionaryData>>,
     word: String,
     client: reqwest::Client,
 ) {
     {
-        let mut state = data.write().unwrap();
+        let mut state = data.lock().unwrap();
         state.loading_status = LoadingStatus::Loading;
     }
 
@@ -226,7 +226,7 @@ async fn fetch_word_definition(
         Err(e) => {
             let error_msg = format!("{e}");
             error!("Dictionary: {error_msg}");
-            let mut state = data.write().unwrap();
+            let mut state = data.lock().unwrap();
             state.loading_status = LoadingStatus::Error(error_msg);
             return;
         }
@@ -238,7 +238,7 @@ async fn fetch_word_definition(
                 .get("resolution")
                 .and_then(|v| v.as_str())
                 .unwrap_or("No definitions found");
-            let mut state = data.write().unwrap();
+            let mut state = data.lock().unwrap();
             state.loading_status = LoadingStatus::Error(resolution.to_string());
             return;
         }
@@ -246,12 +246,12 @@ async fn fetch_word_definition(
 
     let entries: Vec<DictionaryEntry> = entries_array.iter().filter_map(parse_entry).collect();
     if entries.is_empty() {
-        let mut state = data.write().unwrap();
+        let mut state = data.lock().unwrap();
         state.loading_status = LoadingStatus::Error("No definitions found".to_string());
         return;
     }
 
-    let mut state = data.write().unwrap();
+    let mut state = data.lock().unwrap();
     state.entries = entries;
     state.last_updated_at = Some(Local::now());
     state.loading_status = LoadingStatus::Loaded;

@@ -21,7 +21,7 @@ use ratatui::{
 use serde_json;
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tracing::error;
 
@@ -41,8 +41,8 @@ pub struct WeatherState {
 
 #[derive(Clone, Debug)]
 pub struct Weather {
-    state: Arc<RwLock<WeatherState>>,
-    greeting_state: Arc<RwLock<GreetingState>>,
+    state: Arc<Mutex<WeatherState>>,
+    greeting_state: Arc<Mutex<GreetingState>>,
     client: reqwest::Client,
 }
 
@@ -50,21 +50,21 @@ const REFETCH_WEATHER_IN_MINS: i64 = 10;
 const RETRY_WEATHER_ON_ERROR_IN_MINS: i64 = 1;
 
 impl Weather {
-    pub fn new(client: reqwest::Client, greeting_state: Arc<RwLock<GreetingState>>) -> Self {
+    pub fn new(client: reqwest::Client, greeting_state: Arc<Mutex<GreetingState>>) -> Self {
         Self {
-            state: Arc::new(RwLock::new(WeatherState::default())),
+            state: Arc::new(Mutex::new(WeatherState::default())),
             greeting_state,
             client,
         }
     }
 
     fn set_loading_state(&self, status: LoadingStatus) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.loading_status = status;
     }
 
     fn set_error_state(&self, message: String) {
-        let mut state = self.state.write().unwrap();
+        let mut state = self.state.lock().unwrap();
         state.loading_status = LoadingStatus::Error(message);
         state.last_updated_at = Some(Local::now());
     }
@@ -104,7 +104,7 @@ impl Weather {
         self.set_loading_state(LoadingStatus::Loading);
 
         let location_data = {
-            let greeting_state = self.greeting_state.read().unwrap();
+            let greeting_state = self.greeting_state.lock().unwrap();
 
             if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                 self.set_loading_state(LoadingStatus::NotStarted);
@@ -144,7 +144,7 @@ impl Weather {
             }
         };
 
-        let mut weather_state = self.state.write().unwrap();
+        let mut weather_state = self.state.lock().unwrap();
         weather_state.city = city;
 
         if let Some(temp) = current.get("temperature_2m")
@@ -177,8 +177,8 @@ impl Weather {
     }
 
     fn get_weather_display(&self) -> String {
-        let state = self.state.read().unwrap();
-        let greeting_state = self.greeting_state.read().unwrap();
+        let state = self.state.lock().unwrap();
+        let greeting_state = self.greeting_state.lock().unwrap();
         let location_loading = "🌄 Weather is loading...".to_string();
 
         match state.loading_status {
@@ -245,8 +245,8 @@ impl Component for Weather {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let weather_state = self.state.read().unwrap();
-                let greeting_state = self.greeting_state.read().unwrap();
+                let weather_state = self.state.lock().unwrap();
+                let greeting_state = self.greeting_state.lock().unwrap();
 
                 if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                     false
@@ -301,10 +301,10 @@ impl Component for Weather {
         };
 
         let has_forecast_data = {
-            let state = match self.state.read() {
+            let state = match self.state.lock() {
                 Ok(daily_high_temperatures) => daily_high_temperatures,
                 Err(_) => {
-                    error!("Weather: Failed to read state");
+                    error!("Weather: Failed to lock state");
                     return Ok(());
                 }
             };
@@ -314,10 +314,10 @@ impl Component for Weather {
 
         if has_forecast_data {
             let (high_temps, low_temps, weekdays) = {
-                let state = match self.state.read() {
+                let state = match self.state.lock() {
                     Ok(state) => state,
                     Err(_) => {
-                        error!("Weather: Failed to read state");
+                        error!("Weather: Failed to lock state");
                         return Ok(());
                     }
                 };

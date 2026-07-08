@@ -39,7 +39,7 @@ use ratatui_image::{
 };
 use std::sync::{
     Arc,
-    RwLock,
+    Mutex,
 };
 use tokio::sync::mpsc::{
     UnboundedReceiver,
@@ -64,7 +64,7 @@ pub struct ImageState {
 }
 
 pub struct PictureFrame {
-    state: Arc<RwLock<ImageState>>,
+    state: Arc<Mutex<ImageState>>,
     client: reqwest::Client,
     picker: Picker,
     resize_rx: UnboundedReceiver<ResizeRequest>,
@@ -105,7 +105,7 @@ impl PictureFrame {
         let (resize_tx, resize_rx) = unbounded_channel::<ResizeRequest>();
         let protocol = ThreadProtocol::new(resize_tx, None);
         Self {
-            state: Arc::new(RwLock::new(ImageState::default())),
+            state: Arc::new(Mutex::new(ImageState::default())),
             client,
             picker,
             resize_rx,
@@ -115,7 +115,7 @@ impl PictureFrame {
 
     fn maybe_spawn_fetch(&mut self) {
         let should_spawn = {
-            let state = self.state.read().unwrap();
+            let state = self.state.lock().unwrap();
             !state.is_in_flight
                 && (state.is_refetch_requested
                     || matches!(state.loading_status, LoadingStatus::NotStarted))
@@ -123,7 +123,7 @@ impl PictureFrame {
 
         if should_spawn {
             {
-                let mut state = self.state.write().unwrap();
+                let mut state = self.state.lock().unwrap();
                 state.is_in_flight = true;
                 state.is_refetch_requested = false;
                 if matches!(state.loading_status, LoadingStatus::NotStarted) {
@@ -155,7 +155,7 @@ impl PictureFrame {
     /// Install the pending image into the protocol. Called from `update()` (i.e.
     /// between renders), so the expensive encode never blocks `draw()`.
     fn install_pending_image(&mut self) {
-        let pending = self.state.write().unwrap().pending_image.take();
+        let pending = self.state.lock().unwrap().pending_image.take();
         if let Some(image) = pending {
             let protocol = self.picker.new_resize_protocol(image);
             self.protocol.replace_protocol(protocol);
@@ -166,7 +166,7 @@ impl PictureFrame {
 impl Component for PictureFrame {
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         if is_new_image_key(&key) {
-            self.state.write().unwrap().is_refetch_requested = true;
+            self.state.lock().unwrap().is_refetch_requested = true;
         }
         Ok(None)
     }
@@ -181,7 +181,7 @@ impl Component for PictureFrame {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let status = self.state.read().unwrap().loading_status.clone();
+        let status = self.state.lock().unwrap().loading_status.clone();
 
         if let LoadingStatus::Loaded = &status {
             let block = theme::frame_block("🖼  Daily Picture");
@@ -220,7 +220,7 @@ fn force_protocol(protocol_type: ProtocolType) -> Picker {
         Ok(mut picker) => {
             picker.set_protocol_type(protocol_type);
             info!(
-                "Daily Picture graphics protocol: forced {:?}",
+                "Picture frame graphics protocol: forced {:?}",
                 picker.protocol_type()
             );
             picker
@@ -248,7 +248,7 @@ fn auto_picker() -> Picker {
     // who enabled images can override via `DAILY_DASHBOARD_IMAGE_PROTOCOL`.
     if term_program.contains("vscode") {
         info!(
-            "Daily Picture graphics protocol: Halfblocks (VS Code/Cursor terminal; \
+            "Picture frame graphics protocol: Halfblocks (VS Code/Cursor terminal; \
              set DAILY_DASHBOARD_IMAGE_PROTOCOL=iterm2 to override if image support is enabled)"
         );
         return Picker::halfblocks();
@@ -278,7 +278,7 @@ fn auto_picker() -> Picker {
     }
 
     info!(
-        "Daily Picture graphics protocol: {:?} (TERM_PROGRAM={:?})",
+        "Picture frame graphics protocol: {:?} (TERM_PROGRAM={:?})",
         picker.protocol_type(),
         if term_program.is_empty() {
             "<unset>"
@@ -289,16 +289,16 @@ fn auto_picker() -> Picker {
     picker
 }
 
-fn record_error(state: &Arc<RwLock<ImageState>>, message: String) {
+fn record_error(state: &Arc<Mutex<ImageState>>, message: String) {
     error!("{message}");
-    let mut state = state.write().unwrap();
+    let mut state = state.lock().unwrap();
     state.is_in_flight = false;
     if !matches!(state.loading_status, LoadingStatus::Loaded) {
         state.loading_status = LoadingStatus::Error(message);
     }
 }
 
-async fn fetch_image(client: reqwest::Client, state: Arc<RwLock<ImageState>>) {
+async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
     let url = image_url();
 
     let bytes = match http::get_bytes_redirected(&client, &url).await {
@@ -317,7 +317,7 @@ async fn fetch_image(client: reqwest::Client, state: Arc<RwLock<ImageState>>) {
         }
     };
 
-    let mut state = state.write().unwrap();
+    let mut state = state.lock().unwrap();
     state.pending_image = Some(image);
     state.is_in_flight = false;
     state.loading_status = LoadingStatus::Loaded;
