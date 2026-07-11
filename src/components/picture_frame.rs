@@ -289,12 +289,14 @@ fn auto_picker() -> Picker {
     picker
 }
 
-fn record_error(state: &Arc<Mutex<ImageState>>, message: String) {
-    error!("{message}");
+fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
+    let status = LoadingStatus::from_report("Daily Picture", &err);
     let mut state = state.lock().unwrap();
     state.is_in_flight = false;
+    // Keep showing the last-good image if one was already loaded; only surface
+    // the error when there is nothing else to display.
     if !matches!(state.loading_status, LoadingStatus::Loaded) {
-        state.loading_status = LoadingStatus::Error(message);
+        state.loading_status = status;
     }
 }
 
@@ -304,7 +306,7 @@ async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
     let bytes = match http::get_bytes_redirected(&client, &url).await {
         Ok((bytes, _)) => bytes,
         Err(e) => {
-            record_error(&state, format!("failed to download image: {e}"));
+            record_error(&state, e.wrap_err("failed to download image"));
             return;
         }
     };
@@ -312,7 +314,10 @@ async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
     let image = match image::load_from_memory(&bytes) {
         Ok(image) => image,
         Err(e) => {
-            record_error(&state, format!("failed to decode image: {e}"));
+            record_error(
+                &state,
+                color_eyre::eyre::eyre!("failed to decode image: {e}"),
+            );
             return;
         }
     };

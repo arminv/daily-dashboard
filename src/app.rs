@@ -17,7 +17,10 @@ use serde::{
     Serialize,
 };
 use tokio::sync::mpsc;
-use tracing::debug;
+use tracing::{
+    debug,
+    error,
+};
 
 pub struct App {
     config: Config,
@@ -45,6 +48,25 @@ pub enum LoadingStatus {
     Loading,
     Loaded,
     Error(String),
+}
+
+impl LoadingStatus {
+    /// Log a [`color_eyre::Report`] under `prefix` and build an [`Error`](Self::Error)
+    /// status for the UI.
+    ///
+    /// The UI string uses Display (`{err}`); the log uses the alternate form (`{err:#}`)
+    /// so eyre context chains show up in `logs.log`.
+    pub fn from_report(prefix: &str, err: &color_eyre::Report) -> Self {
+        error!("{prefix}: {err:#}");
+        Self::Error(format!("{err}"))
+    }
+
+    /// Log `msg` under `prefix` and build an [`Error`](Self::Error) status for the UI.
+    pub fn from_msg(prefix: &str, msg: impl Into<String>) -> Self {
+        let msg = msg.into();
+        error!("{prefix}: {msg}");
+        Self::Error(msg)
+    }
 }
 
 impl App {
@@ -185,7 +207,7 @@ impl App {
             if let Err(err) = self.dashboard.draw(frame, frame.area()) {
                 let _ = self
                     .action_tx
-                    .send(Action::Error(format!("Failed to draw: {err:?}")));
+                    .send(Action::Error(format!("Failed to draw: {err}")));
             }
         })?;
         Ok(())

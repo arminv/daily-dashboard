@@ -5,7 +5,13 @@ use crate::{
     theme,
 };
 use chrono::Local;
-use color_eyre::Result;
+use color_eyre::{
+    Result,
+    eyre::{
+        WrapErr,
+        bail,
+    },
+};
 use ratatui::{
     Frame,
     layout::{
@@ -25,7 +31,7 @@ use std::sync::{
     Arc,
     Mutex,
 };
-use tracing::error;
+use tracing::debug;
 
 const IP_API_URLS: [&str; 3] = [
     "https://api.ipify.org",
@@ -83,21 +89,20 @@ impl Greeting {
 
         let ip = match self.get_public_ip().await {
             Ok(ip) => ip,
-            Err(error) => {
-                error!("Error fetching public IP: {error}");
-                self.set_loading_state(LoadingStatus::Error(format!(
-                    "Failed to get public IP: {error}",
-                )));
+            Err(e) => {
+                self.set_loading_state(LoadingStatus::from_report("Greeting", &e));
                 return;
             }
         };
 
         let url = GEO_API_URL.replace("{ip}", &ip);
-        let json = match http::get_json(&self.client, &url).await {
+        let json = match http::get_json(&self.client, &url)
+            .await
+            .wrap_err("failed to fetch IP location")
+        {
             Ok(json) => json,
-            Err(error) => {
-                error!("Error fetching IP location: {error}");
-                self.set_loading_state(LoadingStatus::Error(error.to_string()));
+            Err(e) => {
+                self.set_loading_state(LoadingStatus::from_report("Greeting", &e));
                 return;
             }
         };
@@ -108,15 +113,14 @@ impl Greeting {
                 state.location = location_data;
                 state.loading_status = LoadingStatus::Loaded;
             }
-            Err(error) => {
-                error!("Error parsing IP location: {error}");
-                self.set_loading_state(LoadingStatus::Error(error));
+            Err(e) => {
+                self.set_loading_state(LoadingStatus::from_report("Greeting", &e));
             }
         }
     }
 
-    async fn get_public_ip(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        // Try multiple IP API services in case one fails
+    async fn get_public_ip(&self) -> Result<String> {
+        // Try multiple IP API services in case one fails.
         for api_url in IP_API_URLS {
             match http::get_text(&self.client, api_url).await {
                 Ok(ip) => {
@@ -124,11 +128,14 @@ impl Greeting {
                     if !ip.is_empty() {
                         return Ok(ip);
                     }
+                    debug!("Greeting: empty response from {api_url}");
                 }
-                Err(_) => continue,
+                Err(e) => {
+                    debug!("Greeting: IP provider {api_url} failed: {e:#}");
+                }
             }
         }
-        Err("Failed to get public IP".into())
+        bail!("all public-IP providers failed");
     }
 
     fn get_location_display(&self) -> String {
@@ -187,14 +194,14 @@ impl Component for Greeting {
 
 /// Parse an ip-api.com JSON response into [`LocationState`]. Pure (no I/O) so
 /// it can be unit-tested.
-fn parse_location(json: &serde_json::Value) -> Result<LocationState, String> {
+fn parse_location(json: &serde_json::Value) -> Result<LocationState> {
     let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
     if status != "success" {
         let message = json
             .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown error");
-        return Err(format!("ip-api lookup failed: {message}"));
+        bail!("ip-api lookup failed: {message}");
     }
 
     Ok(LocationState {

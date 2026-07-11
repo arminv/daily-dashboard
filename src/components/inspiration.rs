@@ -5,7 +5,14 @@ use crate::{
     http,
     theme,
 };
-use color_eyre::Result;
+use color_eyre::{
+    Result,
+    eyre::{
+        WrapErr,
+        bail,
+        eyre,
+    },
+};
 use ratatui::{
     Frame,
     layout::Rect,
@@ -23,11 +30,11 @@ use ratatui::{
         Wrap,
     },
 };
+use serde_json::Value;
 use std::sync::{
     Arc,
     Mutex,
 };
-use tracing::error;
 
 const QUOTE_API_URL: &str = "https://zenquotes.io/api/today";
 
@@ -63,9 +70,7 @@ impl Inspiration {
         let (quote_text, quote_author) = match self.fetch_quote().await {
             Ok(quote) => quote,
             Err(e) => {
-                let error_msg = format!("Failed to fetch quote: {e}");
-                error!("Inspiration (Quote): {error_msg}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_loading_state(LoadingStatus::from_report("Inspiration", &e));
                 return;
             }
         };
@@ -76,30 +81,39 @@ impl Inspiration {
         state.loading_status = LoadingStatus::Loaded;
     }
 
-    async fn fetch_quote(&self) -> Result<(String, String), String> {
+    async fn fetch_quote(&self) -> Result<(String, String)> {
         let json = http::get_json(&self.client, QUOTE_API_URL)
             .await
-            .map_err(|e| format!("Failed to fetch quote: {e}"))?;
-
-        let entry = json
-            .as_array()
-            .and_then(|arr| arr.first())
-            .ok_or("Unexpected quote response format")?;
-
-        let quote_text = entry
-            .get("q")
-            .and_then(|v| v.as_str())
-            .ok_or("Missing quote text")?
-            .to_string();
-
-        let quote_author = entry
-            .get("a")
-            .and_then(|v| v.as_str())
-            .ok_or("Missing quote author")?
-            .to_string();
-
-        Ok((quote_text, quote_author))
+            .wrap_err("failed to fetch quote")?;
+        parse_quote(&json)
     }
+}
+
+/// Parse a ZenQuotes `/api/today` JSON payload into `(text, author)`. Pure (no
+/// I/O) so it can be unit-tested.
+fn parse_quote(json: &Value) -> Result<(String, String)> {
+    let entry = json
+        .as_array()
+        .and_then(|arr| arr.first())
+        .ok_or_else(|| eyre!("unexpected quote response format"))?;
+
+    let quote_text = entry
+        .get("q")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| eyre!("missing quote text"))?
+        .to_string();
+
+    let quote_author = entry
+        .get("a")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| eyre!("missing quote author"))?
+        .to_string();
+
+    if quote_text.is_empty() {
+        bail!("empty quote text");
+    }
+
+    Ok((quote_text, quote_author))
 }
 
 /// Render a bordered status panel (title + one-line message) for the

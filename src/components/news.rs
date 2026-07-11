@@ -106,18 +106,17 @@ impl News {
         let json = match http::get_json(&self.client, NEWS_API_URL).await {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("News: {e}");
-                error!("{error_msg}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_loading_state(LoadingStatus::from_report("News", &e));
                 return;
             }
         };
 
         let articles = parse_articles(&json);
         if articles.is_empty() {
-            let error_msg = "No articles found in response".to_string();
-            error!("News: {}", error_msg);
-            self.set_loading_state(LoadingStatus::Error(error_msg));
+            self.set_loading_state(LoadingStatus::from_msg(
+                "News",
+                "no articles found in response",
+            ));
             return;
         }
 

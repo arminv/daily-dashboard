@@ -37,10 +37,7 @@ use std::sync::{
     Arc,
     Mutex,
 };
-use tracing::{
-    error,
-    info,
-};
+use tracing::info;
 
 const DICTIONARY_API_URL: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
 
@@ -223,10 +220,8 @@ async fn fetch_word_definition(
     let json: serde_json::Value = match http::get_json(&client, &api_url).await {
         Ok(json) => json,
         Err(e) => {
-            let error_msg = format!("{e}");
-            error!("Dictionary: {error_msg}");
             let mut state = data.lock().unwrap();
-            state.loading_status = LoadingStatus::Error(error_msg);
+            state.loading_status = LoadingStatus::from_report("Dictionary", &e);
             return;
         }
     };
@@ -238,7 +233,7 @@ async fn fetch_word_definition(
                 .and_then(|v| v.as_str())
                 .unwrap_or("No definitions found");
             let mut state = data.lock().unwrap();
-            state.loading_status = LoadingStatus::Error(resolution.to_string());
+            state.loading_status = LoadingStatus::from_msg("Dictionary", resolution);
             return;
         }
     };
@@ -246,7 +241,7 @@ async fn fetch_word_definition(
     let entries: Vec<DictionaryEntry> = entries_array.iter().filter_map(parse_entry).collect();
     if entries.is_empty() {
         let mut state = data.lock().unwrap();
-        state.loading_status = LoadingStatus::Error("No definitions found".to_string());
+        state.loading_status = LoadingStatus::from_msg("Dictionary", "No definitions found");
         return;
     }
 
