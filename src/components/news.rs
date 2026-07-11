@@ -27,6 +27,7 @@ use ratatui::{
         TableState,
     },
 };
+use serde_json::Value;
 use std::sync::{
     Arc,
     Mutex,
@@ -130,7 +131,7 @@ impl News {
 /// Parse the ok.surf news-feed JSON into a flat list of articles, capped at
 /// [`MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY`] per category and
 /// [`MAX_NUMBER_OF_ARTICLES`] overall. Pure (no I/O) so it can be unit-tested.
-fn parse_articles(json: &serde_json::Value) -> Vec<NewsArticle> {
+fn parse_articles(json: &Value) -> Vec<NewsArticle> {
     let mut articles: Vec<NewsArticle> = Vec::new();
     for category in NEWS_CATEGORIES {
         if let Some(values) = json.get(category)
@@ -264,9 +265,6 @@ impl Component for News {
                 .style(Style::default().fg(Color::Yellow))
                 .height(1);
 
-                // Read the selection from the guard we already hold; calling a
-                // helper that re-locks `self.state` here would deadlock (Mutex is
-                // not reentrant).
                 let selected = news_state.table_state.selected();
                 let rows: Vec<Row> = news_state
                     .news_articles
@@ -287,7 +285,6 @@ impl Component for News {
                         .height(1)
                     })
                     .collect();
-
                 let table = Table::new(
                     rows,
                     [

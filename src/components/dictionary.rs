@@ -70,7 +70,6 @@ struct DictionaryEntry {
     meanings: Vec<Meaning>,
 }
 
-/// Send-able state shared with the background fetch task.
 #[derive(Clone, Debug, Default)]
 pub struct DictionaryData {
     loading_status: LoadingStatus,
@@ -260,7 +259,6 @@ async fn fetch_word_definition(
 
 fn parse_entry(entry: &serde_json::Value) -> Option<DictionaryEntry> {
     let word = entry.get("word")?.as_str()?.to_string();
-
     let phonetic = entry
         .get("phonetic")
         .and_then(|v| v.as_str())
@@ -275,7 +273,6 @@ fn parse_entry(entry: &serde_json::Value) -> Option<DictionaryEntry> {
                 })
             })
         });
-
     let meanings = entry
         .get("meanings")
         .and_then(|v| v.as_array())
