@@ -122,9 +122,8 @@ impl Component for Dashboard {
 
     fn update(&mut self, action: crate::action::Action) -> Result<Option<crate::action::Action>> {
         for component in self.components() {
-            let _ = component.update(action.clone());
+            component.update(action.clone())?;
         }
-        let _ = action;
         Ok(None)
     }
 

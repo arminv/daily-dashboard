@@ -5,6 +5,7 @@ use crate::{
     http,
     theme,
 };
+use chrono::Local;
 use color_eyre::{
     Result,
     eyre::{
@@ -37,12 +38,14 @@ use std::sync::{
 };
 
 const QUOTE_API_URL: &str = "https://zenquotes.io/api/today";
+const RETRY_INSPIRATION_ON_ERROR_IN_MINS: i64 = 1;
 
 #[derive(Clone, Debug, Default)]
 pub struct InspirationState {
     pub loading_status: LoadingStatus,
     pub quote_text: String,
     pub quote_author: String,
+    pub last_updated_at: Option<chrono::DateTime<Local>>,
 }
 
 #[derive(Clone, Debug)]
@@ -59,18 +62,17 @@ impl Inspiration {
         }
     }
 
-    fn set_loading_state(&self, status: LoadingStatus) {
+    fn set_error_state(&self, status: LoadingStatus) {
         let mut state = self.state.lock().unwrap();
         state.loading_status = status;
+        state.last_updated_at = Some(Local::now());
     }
 
     async fn fetch_daily_content(&self) {
-        self.set_loading_state(LoadingStatus::Loading);
-
         let (quote_text, quote_author) = match self.fetch_quote().await {
             Ok(quote) => quote,
             Err(e) => {
-                self.set_loading_state(LoadingStatus::from_report("Inspiration", &e));
+                self.set_error_state(LoadingStatus::from_report("Inspiration", &e));
                 return;
             }
         };
@@ -79,6 +81,7 @@ impl Inspiration {
         state.quote_text = quote_text;
         state.quote_author = quote_author;
         state.loading_status = LoadingStatus::Loaded;
+        state.last_updated_at = Some(Local::now());
     }
 
     async fn fetch_quote(&self) -> Result<(String, String)> {
@@ -141,12 +144,22 @@ impl Component for Inspiration {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let state = self.state.lock().unwrap();
-                let is_initial_load = matches!(
-                    state.loading_status,
-                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                );
-                is_initial_load
+                let mut state = self.state.lock().unwrap();
+                let is_stale = |mins: i64| {
+                    state.last_updated_at.is_none_or(|last| {
+                        Local::now().signed_duration_since(last).num_minutes() >= mins
+                    })
+                };
+                let should_fetch = match state.loading_status {
+                    LoadingStatus::NotStarted => true,
+                    LoadingStatus::Loading => false,
+                    LoadingStatus::Loaded => false,
+                    LoadingStatus::Error(_) => is_stale(RETRY_INSPIRATION_ON_ERROR_IN_MINS),
+                };
+                if should_fetch {
+                    state.loading_status = LoadingStatus::Loading;
+                }
+                should_fetch
             };
 
             if should_fetch {

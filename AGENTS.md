@@ -42,7 +42,7 @@ cargo test -- --ignored
 - Main entry point: `src/main.rs`
 - Default config (embedded): `.config/config.json5` (JSON5 with comments)
 - User config directory: platform-specific via the `directories` crate (override with `DAILY_DASHBOARD_CONFIG`)
-- Logs: `logs.log` file for debugging
+- Logs: `logs.log` in the process cwd (gitignored; typically the repo root under `cargo run`)
 
 ## Source Map
 
@@ -160,9 +160,9 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 ### Refresh Intervals
 
 - **Greeting / Location**: fetched once on startup.
-- **Weather**: every 10 minutes (after location is loaded).
-- **News**: every 30 minutes.
-- **Inspiration**: once on the first tick (daily quote).
+- **Weather**: every 10 minutes (after location is loaded). Failed fetches retry after 1 minute.
+- **News**: every 30 minutes. Failed fetches retry after 1 minute. Overlapping fetches are gated by setting `Loading` before spawn.
+- **Inspiration**: once on the first tick (daily quote). Failed fetches retry after 1 minute (not every tick).
 - **Daily Picture**: once on startup, then only on demand via `Shift+N` (a fresh random Lorem Picsum photo each time). `Shift+N` sets `ImageState.refetch_requested`, honored by the next `maybe_spawn_fetch` (deferred if a fetch is already in flight). A failed fetch is not auto-retried; press `Shift+N` to retry (the last-good image keeps showing if one was already loaded).
 - **Dictionary**: on demand, when the user submits a word.
 
