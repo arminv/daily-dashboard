@@ -92,8 +92,6 @@ impl Inspiration {
     }
 }
 
-/// Parse a ZenQuotes `/api/today` JSON payload into `(text, author)`. Pure (no
-/// I/O) so it can be unit-tested.
 fn parse_quote(json: &Value) -> Result<(String, String)> {
     let entry = json
         .as_array()

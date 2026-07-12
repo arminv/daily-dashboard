@@ -51,17 +51,11 @@ pub enum LoadingStatus {
 }
 
 impl LoadingStatus {
-    /// Log a [`color_eyre::Report`] under `prefix` and build an [`Error`](Self::Error)
-    /// status for the UI.
-    ///
-    /// The UI string uses Display (`{err}`); the log uses the alternate form (`{err:#}`)
-    /// so eyre context chains show up in `logs.log`.
     pub fn from_report(prefix: &str, err: &color_eyre::Report) -> Self {
         error!("{prefix}: {err:#}");
         Self::Error(format!("{err}"))
     }
 
-    /// Log `msg` under `prefix` and build an [`Error`](Self::Error) status for the UI.
     pub fn from_msg(prefix: &str, msg: impl Into<String>) -> Self {
         let msg = msg.into();
         error!("{prefix}: {msg}");

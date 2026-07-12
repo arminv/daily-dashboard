@@ -120,7 +120,6 @@ impl Greeting {
     }
 
     async fn get_public_ip(&self) -> Result<String> {
-        // Try multiple IP API services in case one fails.
         for api_url in IP_API_URLS {
             match http::get_text(&self.client, api_url).await {
                 Ok(ip) => {
@@ -192,8 +191,6 @@ impl Component for Greeting {
     }
 }
 
-/// Parse an ip-api.com JSON response into [`LocationState`]. Pure (no I/O) so
-/// it can be unit-tested.
 fn parse_location(json: &serde_json::Value) -> Result<LocationState> {
     let status = json.get("status").and_then(|v| v.as_str()).unwrap_or("");
     if status != "success" {

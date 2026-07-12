@@ -205,8 +205,6 @@ impl Weather {
     }
 }
 
-/// Parse the 7-day forecast (weekday names + high/low temps) from the
-/// Open-Meteo response. Pure (no I/O) so it can be unit-tested.
 fn parse_daily_forecast(json: &serde_json::Value) -> (Vec<String>, Vec<f32>, Vec<f32>) {
     let mut weekdays = Vec::new();
     let mut highs = Vec::new();

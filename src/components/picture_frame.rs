@@ -293,8 +293,7 @@ fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
     let status = LoadingStatus::from_report("Daily Picture", &err);
     let mut state = state.lock().unwrap();
     state.is_in_flight = false;
-    // Keep showing the last-good image if one was already loaded; only surface
-    // the error when there is nothing else to display.
+
     if !matches!(state.loading_status, LoadingStatus::Loaded) {
         state.loading_status = status;
     }
@@ -332,7 +331,7 @@ pub(crate) fn image_url() -> String {
     format!("{PICSUM_BASE_URL}/{PICSUM_WIDTH_PX}/{PICSUM_HEIGHT_PX}")
 }
 
-/// Does this key event request a new image (Shift+N)?
+/// Does this key event request a new image (i.e. `Shift+N`)?
 ///
 /// We run in legacy terminal mode (the app never enables the Kitty keyboard
 /// protocol), where there is no separate "shift" bit on the wire: Shift+n is
@@ -342,7 +341,6 @@ pub(crate) fn image_url() -> String {
 /// A plain lowercase `n`, and any `Ctrl`/`Ctrl+Shift` combo (which arrives as a
 /// control byte, i.e. lowercase `Ctrl+n`), are correctly ignored. The only
 /// ambiguity is that Caps Lock + `n` also yields `N`, which is harmless here.
-/// Pure (no I/O) so it can be unit-tested.
 pub(crate) fn is_new_image_key(key: &KeyEvent) -> bool {
     key.code == KeyCode::Char('N')
 }

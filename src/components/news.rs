@@ -127,9 +127,6 @@ impl News {
     }
 }
 
-/// Parse the ok.surf news-feed JSON into a flat list of articles, capped at
-/// [`MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY`] per category and
-/// [`MAX_NUMBER_OF_ARTICLES`] overall. Pure (no I/O) so it can be unit-tested.
 fn parse_articles(json: &Value) -> Vec<NewsArticle> {
     let mut articles: Vec<NewsArticle> = Vec::new();
     for category in NEWS_CATEGORIES {
