@@ -5,7 +5,15 @@ use crate::{
     http,
     theme,
 };
-use color_eyre::Result;
+use chrono::Local;
+use color_eyre::{
+    Result,
+    eyre::{
+        WrapErr,
+        bail,
+        eyre,
+    },
+};
 use ratatui::{
     Frame,
     layout::Rect,
@@ -23,19 +31,21 @@ use ratatui::{
         Wrap,
     },
 };
+use serde_json::Value;
 use std::sync::{
     Arc,
     Mutex,
 };
-use tracing::error;
 
 const QUOTE_API_URL: &str = "https://zenquotes.io/api/today";
+const RETRY_INSPIRATION_ON_ERROR_IN_MINS: i64 = 1;
 
 #[derive(Clone, Debug, Default)]
 pub struct InspirationState {
     pub loading_status: LoadingStatus,
     pub quote_text: String,
     pub quote_author: String,
+    pub last_updated_at: Option<chrono::DateTime<Local>>,
 }
 
 #[derive(Clone, Debug)]
@@ -52,20 +62,17 @@ impl Inspiration {
         }
     }
 
-    fn set_loading_state(&self, status: LoadingStatus) {
+    fn set_error_state(&self, status: LoadingStatus) {
         let mut state = self.state.lock().unwrap();
         state.loading_status = status;
+        state.last_updated_at = Some(Local::now());
     }
 
     async fn fetch_daily_content(&self) {
-        self.set_loading_state(LoadingStatus::Loading);
-
         let (quote_text, quote_author) = match self.fetch_quote().await {
             Ok(quote) => quote,
             Err(e) => {
-                let error_msg = format!("Failed to fetch quote: {e}");
-                error!("Inspiration (Quote): {error_msg}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_error_state(LoadingStatus::from_report("Inspiration", &e));
                 return;
             }
         };
@@ -74,32 +81,40 @@ impl Inspiration {
         state.quote_text = quote_text;
         state.quote_author = quote_author;
         state.loading_status = LoadingStatus::Loaded;
+        state.last_updated_at = Some(Local::now());
     }
 
-    async fn fetch_quote(&self) -> Result<(String, String), String> {
+    async fn fetch_quote(&self) -> Result<(String, String)> {
         let json = http::get_json(&self.client, QUOTE_API_URL)
             .await
-            .map_err(|e| format!("Failed to fetch quote: {e}"))?;
-
-        let entry = json
-            .as_array()
-            .and_then(|arr| arr.first())
-            .ok_or("Unexpected quote response format")?;
-
-        let quote_text = entry
-            .get("q")
-            .and_then(|v| v.as_str())
-            .ok_or("Missing quote text")?
-            .to_string();
-
-        let quote_author = entry
-            .get("a")
-            .and_then(|v| v.as_str())
-            .ok_or("Missing quote author")?
-            .to_string();
-
-        Ok((quote_text, quote_author))
+            .wrap_err("failed to fetch quote")?;
+        parse_quote(&json)
     }
+}
+
+fn parse_quote(json: &Value) -> Result<(String, String)> {
+    let entry = json
+        .as_array()
+        .and_then(|arr| arr.first())
+        .ok_or_else(|| eyre!("unexpected quote response format"))?;
+
+    let quote_text = entry
+        .get("q")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| eyre!("missing quote text"))?
+        .to_string();
+
+    let quote_author = entry
+        .get("a")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| eyre!("missing quote author"))?
+        .to_string();
+
+    if quote_text.is_empty() {
+        bail!("empty quote text");
+    }
+
+    Ok((quote_text, quote_author))
 }
 
 /// Render a bordered status panel (title + one-line message) for the
@@ -127,12 +142,22 @@ impl Component for Inspiration {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let state = self.state.lock().unwrap();
-                let is_initial_load = matches!(
-                    state.loading_status,
-                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                );
-                is_initial_load
+                let mut state = self.state.lock().unwrap();
+                let is_stale = |mins: i64| {
+                    state.last_updated_at.is_none_or(|last| {
+                        Local::now().signed_duration_since(last).num_minutes() >= mins
+                    })
+                };
+                let should_fetch = match state.loading_status {
+                    LoadingStatus::NotStarted => true,
+                    LoadingStatus::Loading => false,
+                    LoadingStatus::Loaded => false,
+                    LoadingStatus::Error(_) => is_stale(RETRY_INSPIRATION_ON_ERROR_IN_MINS),
+                };
+                if should_fetch {
+                    state.loading_status = LoadingStatus::Loading;
+                }
+                should_fetch
             };
 
             if should_fetch {

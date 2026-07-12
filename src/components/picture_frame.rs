@@ -289,12 +289,13 @@ fn auto_picker() -> Picker {
     picker
 }
 
-fn record_error(state: &Arc<Mutex<ImageState>>, message: String) {
-    error!("{message}");
+fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
+    let status = LoadingStatus::from_report("Daily Picture", &err);
     let mut state = state.lock().unwrap();
     state.is_in_flight = false;
+
     if !matches!(state.loading_status, LoadingStatus::Loaded) {
-        state.loading_status = LoadingStatus::Error(message);
+        state.loading_status = status;
     }
 }
 
@@ -304,7 +305,7 @@ async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
     let bytes = match http::get_bytes_redirected(&client, &url).await {
         Ok((bytes, _)) => bytes,
         Err(e) => {
-            record_error(&state, format!("failed to download image: {e}"));
+            record_error(&state, e.wrap_err("failed to download image"));
             return;
         }
     };
@@ -312,7 +313,10 @@ async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
     let image = match image::load_from_memory(&bytes) {
         Ok(image) => image,
         Err(e) => {
-            record_error(&state, format!("failed to decode image: {e}"));
+            record_error(
+                &state,
+                color_eyre::eyre::eyre!("failed to decode image: {e}"),
+            );
             return;
         }
     };
@@ -327,7 +331,7 @@ pub(crate) fn image_url() -> String {
     format!("{PICSUM_BASE_URL}/{PICSUM_WIDTH_PX}/{PICSUM_HEIGHT_PX}")
 }
 
-/// Does this key event request a new image (Shift+N)?
+/// Does this key event request a new image (i.e. `Shift+N`)?
 ///
 /// We run in legacy terminal mode (the app never enables the Kitty keyboard
 /// protocol), where there is no separate "shift" bit on the wire: Shift+n is
@@ -337,7 +341,6 @@ pub(crate) fn image_url() -> String {
 /// A plain lowercase `n`, and any `Ctrl`/`Ctrl+Shift` combo (which arrives as a
 /// control byte, i.e. lowercase `Ctrl+n`), are correctly ignored. The only
 /// ambiguity is that Caps Lock + `n` also yields `N`, which is harmless here.
-/// Pure (no I/O) so it can be unit-tested.
 pub(crate) fn is_new_image_key(key: &KeyEvent) -> bool {
     key.code == KeyCode::Char('N')
 }

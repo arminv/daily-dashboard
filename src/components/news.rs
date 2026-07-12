@@ -38,6 +38,7 @@ const NEWS_API_URL: &str = "https://ok.surf/api/v1/cors/news-feed";
 const MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY: usize = 30;
 const MAX_NUMBER_OF_ARTICLES: usize = 200;
 const FETCH_INTERVAL_MINS: i64 = 30;
+const RETRY_NEWS_ON_ERROR_IN_MINS: i64 = 1;
 const NEWS_CATEGORIES: [&str; 6] = [
     "Business",
     "Technology",
@@ -83,9 +84,10 @@ impl News {
         }
     }
 
-    fn set_loading_state(&self, status: LoadingStatus) {
+    fn set_error_state(&self, status: LoadingStatus) {
         let mut state = self.state.lock().unwrap();
         state.loading_status = status;
+        state.last_updated_at = Some(Local::now());
     }
 
     fn move_selection(&self, delta: i32) {
@@ -101,23 +103,20 @@ impl News {
     }
 
     async fn fetch_news_data(&self) {
-        self.set_loading_state(LoadingStatus::Loading);
-
         let json = match http::get_json(&self.client, NEWS_API_URL).await {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("News: {e}");
-                error!("{error_msg}");
-                self.set_loading_state(LoadingStatus::Error(error_msg));
+                self.set_error_state(LoadingStatus::from_report("News", &e));
                 return;
             }
         };
 
         let articles = parse_articles(&json);
         if articles.is_empty() {
-            let error_msg = "No articles found in response".to_string();
-            error!("News: {}", error_msg);
-            self.set_loading_state(LoadingStatus::Error(error_msg));
+            self.set_error_state(LoadingStatus::from_msg(
+                "News",
+                "no articles found in response",
+            ));
             return;
         }
 
@@ -128,9 +127,6 @@ impl News {
     }
 }
 
-/// Parse the ok.surf news-feed JSON into a flat list of articles, capped at
-/// [`MAX_NUMBER_OF_ARTICLES_FROM_EACH_CATEGORY`] per category and
-/// [`MAX_NUMBER_OF_ARTICLES`] overall. Pure (no I/O) so it can be unit-tested.
 fn parse_articles(json: &Value) -> Vec<NewsArticle> {
     let mut articles: Vec<NewsArticle> = Vec::new();
     for category in NEWS_CATEGORIES {
@@ -195,20 +191,22 @@ impl Component for News {
     fn update(&mut self, action: Action) -> color_eyre::Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let news_state = self.state.lock().unwrap();
-                let is_initial_load = matches!(
-                    news_state.loading_status,
-                    LoadingStatus::NotStarted | LoadingStatus::Error(_)
-                );
-                let now = Local::now();
-                let should_refresh = match news_state.last_updated_at {
-                    Some(last_updated) => {
-                        let duration = now.signed_duration_since(last_updated);
-                        duration.num_minutes() >= FETCH_INTERVAL_MINS
-                    }
-                    None => true,
+                let mut news_state = self.state.lock().unwrap();
+                let is_stale = |mins: i64| {
+                    news_state.last_updated_at.is_none_or(|last| {
+                        Local::now().signed_duration_since(last).num_minutes() >= mins
+                    })
                 };
-                is_initial_load || should_refresh
+                let should_fetch = match news_state.loading_status {
+                    LoadingStatus::NotStarted => true,
+                    LoadingStatus::Loading => false,
+                    LoadingStatus::Loaded => is_stale(FETCH_INTERVAL_MINS),
+                    LoadingStatus::Error(_) => is_stale(RETRY_NEWS_ON_ERROR_IN_MINS),
+                };
+                if should_fetch {
+                    news_state.loading_status = LoadingStatus::Loading;
+                }
+                should_fetch
             };
 
             if should_fetch {

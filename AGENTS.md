@@ -42,7 +42,7 @@ cargo test -- --ignored
 - Main entry point: `src/main.rs`
 - Default config (embedded): `.config/config.json5` (JSON5 with comments)
 - User config directory: platform-specific via the `directories` crate (override with `DAILY_DASHBOARD_CONFIG`)
-- Logs: `logs.log` file for debugging
+- Logs: `logs.log` in the process cwd (gitignored; typically the repo root under `cargo run`)
 
 ## Source Map
 
@@ -139,7 +139,7 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 ### State Management
 
 - Widget state uses `Arc<Mutex<T>>` (`std::sync`) for thread-safe shared state. There are no true concurrent readers (the render thread and the fetch task never hold a lock at the same time meaningfully), so `Mutex` is used over `RwLock` for a simpler, single-`lock()` mental model. Note `Mutex` is **not reentrant**: never call a helper that locks the same state while already holding its guard (this is why `news::draw` reads the selected index from the guard it holds instead of calling a re-locking helper).
-- `LoadingStatus` enum (`src/app.rs`) tracks async states: `NotStarted`, `Loading`, `Loaded`, `Error(String)`. Error strings use `Display` formatting (`{e}`), not `{e:?}`.
+- `LoadingStatus` enum (`src/app.rs`) tracks async states: `NotStarted`, `Loading`, `Loaded`, `Error(String)`. Fetch/parse failures go through `LoadingStatus::from_report(prefix, &err)` (for `color_eyre::Report`) or `LoadingStatus::from_msg(prefix, msg)` (for plain strings): both log once under `prefix` and build the UI `Error` string with Display formatting (`{e}` / `{e:#}` in logs for eyre chains — never `{e:?}`).
 - Async data fetching uses `tokio::spawn` inside `update()` on `Action::Tick` (or on submit for the Dictionary). The `TextArea` is not `Send`, so the Dictionary keeps it outside the `Arc<Mutex<DictionaryData>>` it shares with its spawn task.
 - **Weather depends on location data from the Greeting component's shared state** — `Dashboard` constructs `Greeting` first and passes `greeting.state.clone()` into `Weather::new(...)`, so there is exactly one location fetch on startup.
 - **Daily Picture** keeps the non-`Clone` `ratatui_image::ThreadProtocol` (the `StatefulImage` state) as a direct field, outside the `Arc<Mutex<ImageState>>` it shares with its fetch task. The fetch task only clones `client` + `state` and decodes bytes to an `image::DynamicImage` (stored as `state.pending_image`); the main thread then creates the protocol from the `Picker` in `update()` (`install_pending_image`). The `Picker` is built once in `Dashboard::new()` (i.e. inside `App::new()`, **before** `tui.enter()` starts the event loop) via `Picker::from_query_stdio()` so its stdin query doesn't race crossterm's `EventStream`, falling back to `Picker::halfblocks()` on terminals with no graphics protocol.
@@ -160,9 +160,9 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 ### Refresh Intervals
 
 - **Greeting / Location**: fetched once on startup.
-- **Weather**: every 10 minutes (after location is loaded).
-- **News**: every 30 minutes.
-- **Inspiration**: once on the first tick (daily quote).
+- **Weather**: every 10 minutes (after location is loaded). Failed fetches retry after 1 minute.
+- **News**: every 30 minutes. Failed fetches retry after 1 minute. Overlapping fetches are gated by setting `Loading` before spawn.
+- **Inspiration**: once on the first tick (daily quote). Failed fetches retry after 1 minute (not every tick).
 - **Daily Picture**: once on startup, then only on demand via `Shift+N` (a fresh random Lorem Picsum photo each time). `Shift+N` sets `ImageState.refetch_requested`, honored by the next `maybe_spawn_fetch` (deferred if a fetch is already in flight). A failed fetch is not auto-retried; press `Shift+N` to retry (the last-good image keeps showing if one was already loaded).
 - **Dictionary**: on demand, when the user submits a word.
 
@@ -227,6 +227,7 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
   - `weather::parse_daily_forecast` — weekday/temp extraction, missing `daily`, bad dates, partial arrays.
   - `dictionary::parse_entry` and `dictionary::build_definition_text` — word/phonetic/meaning extraction, phonetics-array fallback, empty-meaning skipping, rendered text.
   - `greeting::parse_location` — ip-api success/fail status handling, field extraction, missing-field defaults.
+  - `inspiration::parse_quote` — ZenQuotes array shape, missing `q`/`a`, empty text.
   - `picture_frame::image_url` and `picture_frame::is_new_image_key` — Lorem Picsum random-URL construction, and the Shift+N (uppercase `N`) key detection that ignores lowercase `n` and `Ctrl`/`Ctrl+Shift` combos.
 - **Render snapshot tests** use `ratatui::backend::TestBackend` + `Terminal` to draw a widget into a buffer and assert on the visible text (see `src/tests/inspiration.rs`).
 - **HTTP helper tests** (`src/tests/http.rs`) exercise `http::shared_client`, `get_text`, `get_json`, and `get_bytes_redirected` against a tiny in-process HTTP/1.1 server bound to an ephemeral localhost port (no external network, so they run in the default hermetic suite). Covers 200/404 response handling, JSON parse success/failure, and redirect-following with final-URL capture.

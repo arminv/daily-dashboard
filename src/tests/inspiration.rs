@@ -61,3 +61,31 @@ fn inspiration_error_renders_message() {
         "error title should be rendered: {rendered:?}"
     );
 }
+
+#[test]
+fn parse_quote_extracts_text_and_author() {
+    let json = serde_json::json!([{ "q": "Stay hungry.", "a": "Steve" }]);
+    let (text, author) = parse_quote(&json).expect("valid quote should parse");
+    assert_eq!(text, "Stay hungry.");
+    assert_eq!(author, "Steve");
+}
+
+#[test]
+fn parse_quote_rejects_empty_array() {
+    let json = serde_json::json!([]);
+    let err = parse_quote(&json).expect_err("empty array should error");
+    assert!(
+        err.to_string().contains("unexpected quote response format"),
+        "error should mention format: {err}"
+    );
+}
+
+#[test]
+fn parse_quote_rejects_missing_fields() {
+    let json = serde_json::json!([{ "q": "only text" }]);
+    let err = parse_quote(&json).expect_err("missing author should error");
+    assert!(
+        err.to_string().contains("missing quote author"),
+        "error should mention author: {err}"
+    );
+}

@@ -25,7 +25,10 @@ fn parse_location_fail_status_returns_api_message() {
         "message": "invalid query",
     });
     let err = parse_location(&json).expect_err("fail status should error");
-    assert!(err.contains("invalid query"));
+    assert!(
+        err.to_string().contains("invalid query"),
+        "error should include API message: {err}"
+    );
 }
 
 #[test]

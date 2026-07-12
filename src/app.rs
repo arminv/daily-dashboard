@@ -17,7 +17,10 @@ use serde::{
     Serialize,
 };
 use tokio::sync::mpsc;
-use tracing::debug;
+use tracing::{
+    debug,
+    error,
+};
 
 pub struct App {
     config: Config,
@@ -45,6 +48,19 @@ pub enum LoadingStatus {
     Loading,
     Loaded,
     Error(String),
+}
+
+impl LoadingStatus {
+    pub fn from_report(prefix: &str, err: &color_eyre::Report) -> Self {
+        error!("{prefix}: {err:#}");
+        Self::Error(format!("{err}"))
+    }
+
+    pub fn from_msg(prefix: &str, msg: impl Into<String>) -> Self {
+        let msg = msg.into();
+        error!("{prefix}: {msg}");
+        Self::Error(msg)
+    }
 }
 
 impl App {
@@ -159,6 +175,9 @@ impl App {
                 Action::ClearScreen => tui.terminal.clear()?,
                 Action::Resize(w, h) => self.handle_resize(tui, w, h)?,
                 Action::Render => self.render(tui)?,
+                Action::Error(ref msg) => {
+                    error!("{msg}");
+                }
                 _ => {}
             }
 
@@ -185,7 +204,7 @@ impl App {
             if let Err(err) = self.dashboard.draw(frame, frame.area()) {
                 let _ = self
                     .action_tx
-                    .send(Action::Error(format!("Failed to draw: {err:?}")));
+                    .send(Action::Error(format!("Failed to draw: {err}")));
             }
         })?;
         Ok(())

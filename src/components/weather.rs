@@ -63,9 +63,9 @@ impl Weather {
         state.loading_status = status;
     }
 
-    fn set_error_state(&self, message: String) {
+    fn set_error_state(&self, status: LoadingStatus) {
         let mut state = self.state.lock().unwrap();
-        state.loading_status = LoadingStatus::Error(message);
+        state.loading_status = status;
         state.last_updated_at = Some(Local::now());
     }
 
@@ -127,9 +127,7 @@ impl Weather {
         let json: serde_json::Value = match http::get_json(&self.client, &api_url).await {
             Ok(json) => json,
             Err(e) => {
-                let error_msg = format!("Weather: {e}");
-                error!("{error_msg}");
-                self.set_error_state(error_msg);
+                self.set_error_state(LoadingStatus::from_report("Weather", &e));
                 return;
             }
         };
@@ -137,9 +135,10 @@ impl Weather {
         let current = match json.get("current") {
             Some(current) => current,
             None => {
-                let error_msg = "No 'current' field in response".to_string();
-                error!("Weather: {}", error_msg);
-                self.set_error_state(error_msg);
+                self.set_error_state(LoadingStatus::from_msg(
+                    "Weather",
+                    "no 'current' field in response",
+                ));
                 return;
             }
         };
@@ -199,15 +198,13 @@ impl Weather {
                 if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                     "Weather: Waiting for location data...".to_string()
                 } else {
-                    format!("Weather error: {error:?}")
+                    format!("Weather error: {error}")
                 }
             }
         }
     }
 }
 
-/// Parse the 7-day forecast (weekday names + high/low temps) from the
-/// Open-Meteo response. Pure (no I/O) so it can be unit-tested.
 fn parse_daily_forecast(json: &serde_json::Value) -> (Vec<String>, Vec<f32>, Vec<f32>) {
     let mut weekdays = Vec::new();
     let mut highs = Vec::new();
