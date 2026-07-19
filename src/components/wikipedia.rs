@@ -94,13 +94,13 @@ fn enter_action(input: &str, last_query: &str, has_loaded_results: bool) -> Ente
     }
 }
 
-fn status_paragraph<'a>(
-    title: impl Into<ratatui::text::Line<'a>>,
-    text: impl Into<ratatui::text::Text<'a>>,
+fn status_paragraph(
+    title: impl Into<String>,
+    text: impl Into<String>,
     style: Style,
-) -> Paragraph<'a> {
+) -> Paragraph<'static> {
     Paragraph::new(text.into())
-        .block(theme::panel_block(title))
+        .block(theme::panel_block(title.into()))
         .style(style)
         .wrap(Wrap { trim: true })
 }
