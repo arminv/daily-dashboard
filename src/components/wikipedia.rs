@@ -37,12 +37,10 @@ use ratatui::{
     },
 };
 use ratatui_textarea::TextArea;
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        Mutex,
-    },
+use reqwest::Url;
+use std::sync::{
+    Arc,
+    Mutex,
 };
 use tracing::{
     error,
@@ -50,6 +48,7 @@ use tracing::{
 };
 
 const SEARCH_API_URL: &str = "https://en.wikipedia.org/w/api.php";
+const WIKI_ORIGIN: &str = "https://en.wikipedia.org";
 const MAX_RESULTS: usize = 12;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +64,6 @@ struct WikiResult {
     page_id: u64,
     snippet_plain: String,
     page_url: String,
-    wordcount: Option<u64>,
     description: Option<String>,
     extract: Option<String>,
 }
@@ -77,6 +75,7 @@ pub struct WikipediaData {
     results: Vec<WikiResult>,
     list_state: ListState,
     extract_status: LoadingStatus,
+    /// Bumped on each new search so stale in-flight responses are ignored.
     fetch_generation: u64,
 }
 
@@ -105,6 +104,52 @@ fn status_paragraph(
         .wrap(Wrap { trim: true })
 }
 
+fn is_current(data: &Arc<Mutex<WikipediaData>>, generation: u64) -> bool {
+    data.lock().unwrap().fetch_generation == generation
+}
+
+fn search_url(query: &str) -> String {
+    let mut url = Url::parse(SEARCH_API_URL).expect("SEARCH_API_URL is valid");
+    url.query_pairs_mut()
+        .append_pair("action", "query")
+        .append_pair("list", "search")
+        .append_pair("format", "json")
+        .append_pair("formatversion", "2")
+        .append_pair("srlimit", &MAX_RESULTS.to_string())
+        .append_pair("srsearch", query);
+    url.to_string()
+}
+
+fn extracts_url(page_ids: &[u64]) -> String {
+    let ids = page_ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join("|");
+    let mut url = Url::parse(SEARCH_API_URL).expect("SEARCH_API_URL is valid");
+    url.query_pairs_mut()
+        .append_pair("action", "query")
+        .append_pair("format", "json")
+        .append_pair("formatversion", "2")
+        .append_pair("prop", "extracts|description")
+        .append_pair("exintro", "1")
+        .append_pair("explaintext", "1")
+        .append_pair("pageids", &ids);
+    url.to_string()
+}
+
+fn wiki_page_url(title: &str) -> String {
+    let mut url = Url::parse(WIKI_ORIGIN).expect("WIKI_ORIGIN is valid");
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .expect("WIKI_ORIGIN supports path segments");
+        segments.push("wiki");
+        segments.push(&title.replace(' ', "_"));
+    }
+    url.to_string()
+}
+
 pub struct Wikipedia {
     data: Arc<Mutex<WikipediaData>>,
     input: TextArea<'static>,
@@ -131,14 +176,6 @@ impl Wikipedia {
             input_mode: InputMode::Normal,
             client,
         }
-    }
-
-    fn start_editing(&mut self) {
-        self.input_mode = InputMode::Editing;
-    }
-
-    fn stop_editing(&mut self) {
-        self.input_mode = InputMode::Normal;
     }
 
     fn submit_search(&mut self) {
@@ -270,11 +307,7 @@ impl Wikipedia {
                     .results
                     .iter()
                     .map(|result| {
-                        let mut title_text = result.title.clone();
-                        if let Some(words) = result.wordcount {
-                            title_text.push_str(&format!(" · {words} words"));
-                        }
-                        let mut lines = vec![Line::from(title_text)];
+                        let mut lines = vec![Line::from(result.title.clone())];
                         if !result.snippet_plain.is_empty() {
                             lines.push(Line::from(Span::styled(
                                 format!("  {}", result.snippet_plain),
@@ -308,30 +341,8 @@ impl Wikipedia {
             .map(|r| format!("Extract — {}", r.title))
             .unwrap_or_else(|| "Extract".to_string());
 
-        if !matches!(data.loading_status, LoadingStatus::Loaded) {
-            frame.render_widget(
-                status_paragraph(
-                    title,
-                    "Select a result to read its extract.",
-                    Style::default().fg(theme::HINT),
-                ),
-                area,
-            );
-            return;
-        }
-
-        match &data.extract_status {
-            LoadingStatus::NotStarted => {
-                frame.render_widget(
-                    status_paragraph(
-                        title,
-                        "Select a result to read its extract.",
-                        Style::default().fg(theme::HINT),
-                    ),
-                    area,
-                );
-            }
-            LoadingStatus::Loading => {
+        match (&data.loading_status, &data.extract_status) {
+            (LoadingStatus::Loaded, LoadingStatus::Loading) => {
                 let body = selected
                     .map(|r| r.snippet_plain.as_str())
                     .filter(|s| !s.is_empty())
@@ -342,13 +353,13 @@ impl Wikipedia {
                     area,
                 );
             }
-            LoadingStatus::Error(error) => {
+            (LoadingStatus::Loaded, LoadingStatus::Error(error)) => {
                 frame.render_widget(
                     status_paragraph(title, error.clone(), Style::default().fg(theme::ERROR)),
                     area,
                 );
             }
-            LoadingStatus::Loaded => {
+            (LoadingStatus::Loaded, LoadingStatus::Loaded) => {
                 let hint = Line::from(Span::styled(
                     "↑/↓ move · Enter open (same query) or search",
                     Style::default().fg(theme::HINT),
@@ -380,6 +391,16 @@ impl Wikipedia {
                     .wrap(Wrap { trim: true });
                 frame.render_widget(paragraph, area);
             }
+            _ => {
+                frame.render_widget(
+                    status_paragraph(
+                        title,
+                        "Select a result to read its extract.",
+                        Style::default().fg(theme::HINT),
+                    ),
+                    area,
+                );
+            }
         }
     }
 }
@@ -390,35 +411,30 @@ async fn fetch_search_results(
     generation: u64,
     client: reqwest::Client,
 ) {
-    let api_url = format!(
-        "{SEARCH_API_URL}?action=query&list=search&format=json&formatversion=2&srlimit={MAX_RESULTS}&srsearch={}",
-        encode_component(&query)
-    );
+    let api_url = search_url(&query);
     info!("Wikipedia: fetching search {api_url}");
 
     let json: serde_json::Value = match http::get_json(&client, &api_url).await {
         Ok(json) => json,
         Err(e) => {
-            let mut state = data.lock().unwrap();
-            if state.fetch_generation != generation {
+            if !is_current(&data, generation) {
                 return;
             }
-            state.loading_status = LoadingStatus::from_report("Wikipedia", &e);
+            data.lock().unwrap().loading_status = LoadingStatus::from_report("Wikipedia", &e);
             return;
         }
     };
 
-    if data.lock().unwrap().fetch_generation != generation {
+    if !is_current(&data, generation) {
         return;
     }
 
     let results = parse_search_results(&json);
     if results.is_empty() {
-        let mut state = data.lock().unwrap();
-        if state.fetch_generation != generation {
+        if !is_current(&data, generation) {
             return;
         }
-        state.loading_status =
+        data.lock().unwrap().loading_status =
             LoadingStatus::from_msg("Wikipedia", format!("No results for \"{query}\""));
         return;
     }
@@ -452,14 +468,7 @@ async fn fetch_extracts_batch(
     if page_ids.is_empty() {
         return;
     }
-    let ids = page_ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<_>>()
-        .join("|");
-    let api_url = format!(
-        "{SEARCH_API_URL}?action=query&format=json&formatversion=2&prop=extracts|description&exintro=1&explaintext=1&pageids={ids}"
-    );
+    let api_url = extracts_url(&page_ids);
     info!(
         "Wikipedia: fetching extracts batch ({}) {api_url}",
         page_ids.len()
@@ -468,21 +477,20 @@ async fn fetch_extracts_batch(
     let json: serde_json::Value = match http::get_json(&client, &api_url).await {
         Ok(json) => json,
         Err(e) => {
-            let mut state = data.lock().unwrap();
-            if state.fetch_generation != generation {
+            if !is_current(&data, generation) {
                 return;
             }
-            state.extract_status = LoadingStatus::from_report("Wikipedia extract", &e);
+            data.lock().unwrap().extract_status =
+                LoadingStatus::from_report("Wikipedia extract", &e);
             return;
         }
     };
 
-    let extracts = parse_extracts_query(&json);
     let mut state = data.lock().unwrap();
     if state.fetch_generation != generation {
         return;
     }
-    apply_extracts(&mut state.results, &extracts);
+    apply_extracts_from_query(&mut state.results, &json);
     state.extract_status = LoadingStatus::Loaded;
 }
 
@@ -498,7 +506,6 @@ fn parse_search_results(json: &serde_json::Value) -> Vec<WikiResult> {
             let page_id = item.get("pageid")?.as_u64()?;
             let snippet_html = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
             let snippet_plain = strip_search_html(snippet_html);
-            let wordcount = item.get("wordcount").and_then(|v| v.as_u64());
             let page_url = wiki_page_url(&title);
             let extract = (!snippet_plain.is_empty()).then_some(snippet_plain.clone());
             Some(WikiResult {
@@ -506,7 +513,6 @@ fn parse_search_results(json: &serde_json::Value) -> Vec<WikiResult> {
                 page_id,
                 snippet_plain,
                 page_url,
-                wordcount,
                 description: None,
                 extract,
             })
@@ -515,39 +521,30 @@ fn parse_search_results(json: &serde_json::Value) -> Vec<WikiResult> {
         .collect()
 }
 
-/// Map of page_id → (optional description, extract text) from `prop=extracts|description`.
-fn parse_extracts_query(json: &serde_json::Value) -> HashMap<u64, (Option<String>, String)> {
-    let mut out = HashMap::new();
+/// Fill `description` / `extract` on matching results from `prop=extracts|description`.
+fn apply_extracts_from_query(results: &mut [WikiResult], json: &serde_json::Value) {
     let Some(pages) = json.pointer("/query/pages").and_then(|v| v.as_array()) else {
-        return out;
+        return;
     };
     for page in pages {
         let Some(page_id) = page.get("pageid").and_then(|v| v.as_u64()) else {
             continue;
         };
-        let extract = page
+        let Some(extract) = page
             .get("extract")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        if extract.is_empty() {
+            .filter(|s| !s.is_empty())
+        else {
             continue;
-        }
+        };
         let description = page
             .get("description")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .filter(|s| !s.is_empty());
-        out.insert(page_id, (description, extract));
-    }
-    out
-}
-
-fn apply_extracts(results: &mut [WikiResult], extracts: &HashMap<u64, (Option<String>, String)>) {
-    for result in results.iter_mut() {
-        if let Some((description, extract)) = extracts.get(&result.page_id) {
-            result.description = description.clone();
-            result.extract = Some(extract.clone());
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        if let Some(result) = results.iter_mut().find(|r| r.page_id == page_id) {
+            result.description = description;
+            result.extract = Some(extract.to_string());
         }
     }
 }
@@ -571,27 +568,6 @@ fn strip_search_html(html: &str) -> String {
         .replace("&nbsp;", " ")
 }
 
-fn wiki_page_url(title: &str) -> String {
-    format!(
-        "https://en.wikipedia.org/wiki/{}",
-        encode_component(&title.replace(' ', "_"))
-    )
-}
-
-fn encode_component(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char);
-            }
-            b' ' => out.push_str("%20"),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
 fn is_search_activation_key(key: KeyEvent) -> bool {
     key.code == KeyCode::Char('/') && key.modifiers.is_empty()
 }
@@ -609,14 +585,14 @@ impl Component for Wikipedia {
         match self.input_mode {
             InputMode::Normal => {
                 if is_search_activation_key(key) {
-                    self.start_editing();
+                    self.input_mode = InputMode::Editing;
                     return Ok(Some(Action::Render));
                 }
                 Ok(None)
             }
             InputMode::Editing => {
                 match key.code {
-                    KeyCode::Esc => self.stop_editing(),
+                    KeyCode::Esc => self.input_mode = InputMode::Normal,
                     KeyCode::Enter => self.handle_enter_while_editing(),
                     KeyCode::Up => self.move_selection(-1),
                     KeyCode::Down => self.move_selection(1),

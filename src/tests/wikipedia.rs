@@ -14,7 +14,6 @@ fn parse_search_results_extracts_title_pageid_and_snippet() {
                     "ns": 0,
                     "title": "Rust (programming language)",
                     "pageid": 12345,
-                    "wordcount": 12000,
                     "snippet": "Rust is a <span class=\"searchmatch\">multi-paradigm</span> language."
                 },
                 {
@@ -30,7 +29,6 @@ fn parse_search_results_extracts_title_pageid_and_snippet() {
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].title, "Rust (programming language)");
     assert_eq!(results[0].page_id, 12345);
-    assert_eq!(results[0].wordcount, Some(12000));
     assert_eq!(
         results[0].snippet_plain,
         "Rust is a multi-paradigm language."
@@ -42,7 +40,6 @@ fn parse_search_results_extracts_title_pageid_and_snippet() {
     );
     assert_eq!(results[1].title, "Rust");
     assert_eq!(results[1].page_id, 67890);
-    assert!(results[1].wordcount.is_none());
 }
 
 #[test]
@@ -81,52 +78,13 @@ fn strip_search_html_removes_tags_and_common_entities() {
 }
 
 #[test]
-fn parse_extracts_query_maps_page_id_to_description_and_extract() {
-    let json = serde_json::json!({
-        "query": {
-            "pages": [
-                {
-                    "pageid": 12345,
-                    "title": "Rust",
-                    "description": "General-purpose programming language",
-                    "extract": "Rust is a systems programming language."
-                },
-                {
-                    "pageid": 99,
-                    "title": "Empty",
-                    "extract": ""
-                },
-                {
-                    "pageid": 7,
-                    "title": "No description",
-                    "extract": "Just an extract."
-                }
-            ]
-        }
-    });
-    let extracts = parse_extracts_query(&json);
-    assert_eq!(extracts.len(), 2);
-    let (desc, extract) = extracts.get(&12345).expect("page 12345");
-    assert_eq!(
-        desc.as_deref(),
-        Some("General-purpose programming language")
-    );
-    assert_eq!(extract, "Rust is a systems programming language.");
-    let (desc7, extract7) = extracts.get(&7).expect("page 7");
-    assert!(desc7.is_none());
-    assert_eq!(extract7, "Just an extract.");
-    assert!(!extracts.contains_key(&99));
-}
-
-#[test]
-fn apply_extracts_fills_matching_results() {
+fn apply_extracts_from_query_fills_matching_results() {
     let mut results = vec![
         WikiResult {
             title: "A".into(),
             page_id: 1,
             snippet_plain: "snip".into(),
             page_url: "https://en.wikipedia.org/wiki/A".into(),
-            wordcount: None,
             description: None,
             extract: Some("snip".into()),
         },
@@ -135,14 +93,30 @@ fn apply_extracts_fills_matching_results() {
             page_id: 2,
             snippet_plain: String::new(),
             page_url: "https://en.wikipedia.org/wiki/B".into(),
-            wordcount: None,
             description: None,
             extract: None,
         },
     ];
-    let mut map = std::collections::HashMap::new();
-    map.insert(1, (Some("desc".into()), "full extract".into()));
-    apply_extracts(&mut results, &map);
+    let json = serde_json::json!({
+        "query": {
+            "pages": [
+                {
+                    "pageid": 1,
+                    "description": "desc",
+                    "extract": "full extract"
+                },
+                {
+                    "pageid": 99,
+                    "extract": "ignored"
+                },
+                {
+                    "pageid": 2,
+                    "extract": ""
+                }
+            ]
+        }
+    });
+    apply_extracts_from_query(&mut results, &json);
     assert_eq!(results[0].description.as_deref(), Some("desc"));
     assert_eq!(results[0].extract.as_deref(), Some("full extract"));
     assert!(results[1].extract.is_none());
@@ -170,6 +144,16 @@ fn is_search_activation_key_matches_slash_without_modifiers() {
 
     let n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE);
     assert!(!is_search_activation_key(n));
+}
+
+#[test]
+fn wiki_page_url_encodes_title_path() {
+    let url = wiki_page_url("Rust (programming language)");
+    assert!(url.starts_with("https://en.wikipedia.org/wiki/"));
+    assert!(
+        url.contains("Rust_(programming_language)")
+            || url.contains("Rust_%28programming_language%29")
+    );
 }
 
 #[test]
