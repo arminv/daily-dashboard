@@ -37,6 +37,7 @@ use ratatui_image::{
         ThreadProtocol,
     },
 };
+use reqwest::Client;
 use std::sync::{
     Arc,
     Mutex,
@@ -65,7 +66,7 @@ pub struct ImageState {
 
 pub struct PictureFrame {
     state: Arc<Mutex<ImageState>>,
-    client: reqwest::Client,
+    client: Client,
     picker: Picker,
     resize_rx: UnboundedReceiver<ResizeRequest>,
     protocol: ThreadProtocol,
@@ -97,7 +98,7 @@ impl PictureFrame {
         }
     }
 
-    pub fn new(client: reqwest::Client, picker: Picker) -> Self {
+    pub fn new(client: Client, picker: Picker) -> Self {
         // ThreadProtocol offloads the heavy resize+encode work off the render
         // path: it sends ResizeRequests through this channel, which we drain in
         // `update()` and feed the encoded result back via
@@ -299,7 +300,7 @@ fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
     }
 }
 
-async fn fetch_image(client: reqwest::Client, state: Arc<Mutex<ImageState>>) {
+async fn fetch_image(client: Client, state: Arc<Mutex<ImageState>>) {
     let url = image_url();
 
     let bytes = match http::get_bytes_redirected(&client, &url).await {

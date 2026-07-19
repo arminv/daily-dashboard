@@ -26,6 +26,7 @@ pub mod inspiration;
 pub mod news;
 pub mod picture_frame;
 pub mod weather;
+pub mod wikipedia;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 ///
@@ -70,6 +71,15 @@ pub trait Component {
     fn init(&mut self, area: Size) -> Result<()> {
         let _ = area; // to appease clippy
         Ok(())
+    }
+    /// Whether this component is currently capturing keyboard input (e.g. a
+    /// text field in edit mode).
+    ///
+    /// The Dashboard delivers events to capturing components **before** others,
+    /// so a Dictionary edit session isn't interrupted by Wikipedia's `/`
+    /// activation (Wikipedia is registered earlier for Esc-to-exit priority).
+    fn is_capturing_input(&self) -> bool {
+        false
     }
     /// Handle incoming events and produce actions if necessary.
     ///

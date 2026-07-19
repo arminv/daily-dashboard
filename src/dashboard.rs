@@ -12,6 +12,7 @@ use crate::{
         news::News,
         picture_frame::PictureFrame,
         weather::Weather,
+        wikipedia::Wikipedia,
     },
     config::Config,
     theme,
@@ -40,6 +41,7 @@ pub struct Dashboard {
     inspiration: Inspiration,
     dictionary: Dictionary,
     picture_frame: PictureFrame,
+    wikipedia: Wikipedia,
     news: News,
 }
 
@@ -63,18 +65,20 @@ impl Dashboard {
             inspiration: Inspiration::new(client.clone()),
             dictionary: Dictionary::new(client.clone()),
             picture_frame,
+            wikipedia: Wikipedia::new(client.clone()),
             news: News::new(client),
         }
     }
 
-    fn components(&mut self) -> [&mut dyn Component; 7] {
+    fn components(&mut self) -> [&mut dyn Component; 8] {
         [
             &mut self.calendar,
             &mut self.greeting,
             &mut self.weather,
             &mut self.inspiration,
-            &mut self.dictionary,
             &mut self.picture_frame,
+            &mut self.wikipedia,
+            &mut self.dictionary,
             &mut self.news,
         ]
     }
@@ -108,12 +112,14 @@ impl Component for Dashboard {
         &mut self,
         event: Option<crate::tui::Event>,
     ) -> Result<Option<crate::action::Action>> {
-        // A component that is actively handling input (e.g. the Dictionary while
-        // editing) returns `Some(Action::Render)` to signal that it consumed the
-        // event. Stop propagating so sibling widgets (e.g. News, whose `Enter`
-        // opens an article) don't also react to the same keypress.
         for component in self.components() {
-            if component.handle_events(event.clone())?.is_some() {
+            if component.is_capturing_input() && component.handle_events(event.clone())?.is_some() {
+                return Ok(None);
+            }
+        }
+        for component in self.components() {
+            if !component.is_capturing_input() && component.handle_events(event.clone())?.is_some()
+            {
                 break;
             }
         }
@@ -137,9 +143,10 @@ impl Component for Dashboard {
         let top_row_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![
-                Constraint::Min(30),
-                Constraint::Min(30),
-                Constraint::Min(30),
+                Constraint::Min(22),
+                Constraint::Min(22),
+                Constraint::Min(22),
+                Constraint::Min(22),
             ])
             .flex(Flex::SpaceBetween)
             .spacing(1)
@@ -175,6 +182,7 @@ impl Component for Dashboard {
         self.inspiration.draw(frame, left_col_layout[1])?;
         self.weather.draw(frame, top_row_layout[1])?;
         self.picture_frame.draw(frame, top_row_layout[2])?;
+        self.dictionary.draw(frame, top_row_layout[3])?;
 
         let bottom_row_layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -182,7 +190,7 @@ impl Component for Dashboard {
             .flex(Flex::SpaceBetween)
             .spacing(1)
             .split(page_layout[1]);
-        self.dictionary.draw(frame, bottom_row_layout[0])?;
+        self.wikipedia.draw(frame, bottom_row_layout[0])?;
         self.news.draw(frame, bottom_row_layout[1])?;
         Ok(())
     }

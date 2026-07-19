@@ -6,7 +6,16 @@ use serde_json::Value;
 use std::time::Duration;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-const USER_AGENT: &str = concat!("daily-dashboard/", env!("CARGO_PKG_VERSION"));
+/// Wikimedia requires a descriptive UA with contact info (URL and/or email).
+/// A bare `name/version` string is treated as poorly identified and rate-limits hard.
+/// See <https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy>.
+const USER_AGENT: &str = concat!(
+    "daily-dashboard/",
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("CARGO_PKG_REPOSITORY"),
+    "; arminvarshokar@gmail.com)"
+);
 
 /// Build the single HTTP client shared by every widget.
 ///
