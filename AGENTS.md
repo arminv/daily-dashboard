@@ -147,7 +147,7 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 
 ### HTTP & Data Fetching
 
-- `src/http.rs` builds one shared `reqwest::Client` (10s timeout, descriptive `daily-dashboard/<version> (<repo>; <email>)` user-agent required by Wikimedia's UA policy, pooled connections). Cloning a `Client` is cheap, so the single client is cloned into each fetching widget instead of being rebuilt per request.
+- `src/http.rs` builds one shared `reqwest::Client` (10s timeout, descriptive `daily-dashboard/<version> (<repo>)` user-agent required by Wikimedia's UA policy, pooled connections). Cloning a `Client` is cheap, so the single client is cloned into each fetching widget instead of being rebuilt per request.
 - `http::get_json(url)`, `http::get_text(url)`, and `http::get_bytes_redirected(url)` handle the GET → `error_for_status` → body decode → JSON / text / raw bytes ladder, returning `color_eyre::Result`. Every widget fetch (greeting, weather, news, inspiration, dictionary, wikipedia) goes through these helpers; the Daily Picture widget uses `get_bytes_redirected` for the image file and decodes it with `image::load_from_memory`.
 - IP **geolocation** uses the free [ip-api.com](https://ip-api.com/) JSON endpoint via `http::get_json` (after resolving the public IP from ipify / ifconfig.me / icanhazip).
 

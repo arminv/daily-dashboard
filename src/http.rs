@@ -14,7 +14,7 @@ const USER_AGENT: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     " (",
     env!("CARGO_PKG_REPOSITORY"),
-    "; arminvarshokar@gmail.com)"
+    ")"
 );
 
 /// Build the single HTTP client shared by every widget.
