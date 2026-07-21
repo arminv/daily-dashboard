@@ -49,7 +49,7 @@ use tracing::{
 
 const SEARCH_API_URL: &str = "https://en.wikipedia.org/w/api.php";
 const WIKI_ORIGIN: &str = "https://en.wikipedia.org";
-const MAX_RESULTS: usize = 12;
+const MAX_RESULTS: usize = 15;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum InputMode {
@@ -75,7 +75,6 @@ pub struct WikipediaData {
     results: Vec<WikiResult>,
     list_state: ListState,
     extract_status: LoadingStatus,
-    /// Bumped on each new search so stale in-flight responses are ignored.
     fetch_generation: u64,
 }
 
@@ -164,14 +163,8 @@ impl Wikipedia {
         input.set_cursor_style(Style::default().bg(Color::Red));
         input.set_placeholder_text("Search Wikipedia...");
 
-        let mut list_state = ListState::default();
-        list_state.select(Some(0));
-
         Self {
-            data: Arc::new(Mutex::new(WikipediaData {
-                list_state,
-                ..Default::default()
-            })),
+            data: Arc::new(Mutex::new(WikipediaData::default())),
             input,
             input_mode: InputMode::Normal,
             client,
