@@ -388,6 +388,10 @@ fn build_definition_text(entries: &[DictionaryEntry]) -> Text<'static> {
 }
 
 impl Component for Dictionary {
+    fn is_capturing_input(&self) -> bool {
+        self.input_mode == InputMode::Editing
+    }
+
     fn handle_events(&mut self, event: Option<Event>) -> color_eyre::Result<Option<Action>> {
         let Some(Event::Key(key)) = event else {
             return Ok(None);

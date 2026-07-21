@@ -2,7 +2,7 @@
 name = "daily-dashboard"
 version = "0.1.0"
 edition = "2024"
-description = "A TUI to show useful information throughout the day."
+description = "A TUI to show useful information throughout the day: weather, news, calendar, picture, quote, dictionary, and Wikipedia search."
 authors = ["Armin Varshokar <arminvarshokar@gmail.com>"]
 build = "build.rs"
 repository = "https://github.com/arminv/daily-dashboard"

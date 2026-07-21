@@ -5,8 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A terminal dashboard you can keep open all day - weather, news, a calendar, a
-daily picture, a daily quote, and a built-in dictionary, all in one `ratatui`
-screen.
+daily picture, a daily quote, a built-in dictionary, and Wikipedia search, all
+in one `ratatui` screen.
 
 ![Daily Dashboard Demo](Demo.png)
 
@@ -21,12 +21,14 @@ screen.
 - **Daily inspiration** - a fresh quote each day (ZenQuotes).
 - **Dictionary** - look up any word and read its definitions inline
   ([Free Dictionary API](https://dictionaryapi.dev)).
+- **Wikipedia** - search English Wikipedia, browse results with lead extracts,
+  and open articles in your browser ([MediaWiki API](https://www.mediawiki.org/wiki/API:Main_page)).
 - **News feed** - scrollable, categorized headlines; open any article in your
   browser (ok.surf).
 
 No API keys required - every data source is free and public, including the
 daily picture (served by [Lorem Picsum](https://picsum.photos), which needs no key
-and has no meaningful rate limit).
+and has no meaningful rate limit) and Wikipedia.
 
 The daily picture is rendered via `ratatui-image`, which auto-detects your
 terminal's graphics protocol (kitty / iTerm2 / sixel) and falls back to unicode
@@ -45,28 +47,57 @@ cargo run
 
 ## Keybindings
 
-| Key                       | Action                                  |
-| ------------------------- | --------------------------------------- |
-| `q` / `Ctrl-c` / `Ctrl-d` | Quit                                    |
-| `Esc`                     | Enter dictionary search mode            |
-| `Enter`                   | Search the typed word (in dictionary)   |
-| `i` / `↑`                 | Move news selection up                  |
-| `j` / `↓`                 | Move news selection down                |
-| `Enter`                   | Open selected article in browser (news) |
-| `Shift+N`                 | Fetch a new daily picture               |
+**Global** (configurable in `config.json5`; see `.config/config.json5`):
 
-Keybindings are configurable in `config.json5` (see `.config/config.json5`).
+| Key                       | Action                    |
+| ------------------------- | ------------------------- |
+| `q` / `Ctrl-c` / `Ctrl-d` | Quit                      |
+| `Ctrl-z`                  | Suspend (return to shell) |
+
+**Dictionary**
+
+| Key     | Action                                 |
+| ------- | -------------------------------------- |
+| `Esc`   | Enter / leave search mode              |
+| `Enter` | Look up the typed word (while editing) |
+
+**Wikipedia**
+
+| Key     | Action                                                             |
+| ------- | ------------------------------------------------------------------ |
+| `/`     | Enter search mode                                                  |
+| `Esc`   | Leave search mode                                                  |
+| `↑`/`↓` | Move result selection (while editing; list scrolls with selection) |
+| `Enter` | Search, or open the selected article if the query is unchanged     |
+
+**News**
+
+| Key       | Action                |
+| --------- | --------------------- |
+| `i` / `↑` | Move selection up     |
+| `j` / `↓` | Move selection down   |
+| `Enter`   | Open selected article |
+
+**Daily Picture**
+
+| Key       | Action                    |
+| --------- | ------------------------- |
+| `Shift+N` | Fetch a new daily picture |
+
+While Dictionary or Wikipedia is editing, that widget consumes all keypresses so
+siblings (e.g. News) do not also react.
 
 ## Data sources
 
-| Widget        | Source                                           | Refresh             |
-| ------------- | ------------------------------------------------ | ------------------- |
-| Greeting      | Public IP + [ip-api.com](https://ip-api.com)     | Once                |
-| Weather       | [Open-Meteo](https://open-meteo.com)             | 10 minutes          |
-| Inspiration   | [ZenQuotes](https://zenquotes.io)                | Daily               |
-| Dictionary    | [Free Dictionary API](https://dictionaryapi.dev) | On demand           |
-| News          | [ok.surf](https://ok.surf)                       | 30 minutes          |
-| Daily Picture | [Lorem Picsum](https://picsum.photos)            | Startup + on-demand |
+| Widget        | Source                                                                   | Refresh                  |
+| ------------- | ------------------------------------------------------------------------ | ------------------------ |
+| Greeting      | Public IP + [ip-api.com](https://ip-api.com)                             | Once                     |
+| Weather       | [Open-Meteo](https://open-meteo.com)                                     | 10 minutes               |
+| Inspiration   | [ZenQuotes](https://zenquotes.io)                                        | Daily                    |
+| Dictionary    | [Free Dictionary API](https://dictionaryapi.dev)                         | On demand                |
+| Wikipedia     | [MediaWiki search](https://www.mediawiki.org/wiki/API:Search) + extracts | On demand (2 req/search) |
+| News          | [ok.surf](https://ok.surf)                                               | 30 minutes               |
+| Daily Picture | [Lorem Picsum](https://picsum.photos)                                    | Startup + on-demand      |
 
 ## Built with
 
