@@ -9,6 +9,10 @@ use crate::{
         Tui,
     },
 };
+use chrono::{
+    DateTime,
+    Local,
+};
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::Rect;
@@ -60,6 +64,38 @@ impl LoadingStatus {
         let msg = msg.into();
         error!("{prefix}: {msg}");
         Self::Error(msg)
+    }
+
+    pub fn is_fetch_due(
+        &self,
+        now: DateTime<Local>,
+        last_updated_at: Option<DateTime<Local>>,
+        refetch_after_mins: Option<i64>,
+        retry_after_mins: i64,
+    ) -> bool {
+        let is_stale = |mins: i64| {
+            last_updated_at.is_none_or(|last| now.signed_duration_since(last).num_minutes() >= mins)
+        };
+        match self {
+            Self::NotStarted => true,
+            Self::Loading => false,
+            Self::Loaded => refetch_after_mins.is_some_and(is_stale),
+            Self::Error(_) => is_stale(retry_after_mins),
+        }
+    }
+
+    pub fn begin_fetch_if_due(
+        &mut self,
+        now: DateTime<Local>,
+        last_updated_at: Option<DateTime<Local>>,
+        refetch_after_mins: Option<i64>,
+        retry_after_mins: i64,
+    ) -> bool {
+        if !self.is_fetch_due(now, last_updated_at, refetch_after_mins, retry_after_mins) {
+            return false;
+        }
+        *self = Self::Loading;
+        true
     }
 }
 
@@ -210,3 +246,7 @@ impl App {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/loading_status.rs"]
+mod tests;

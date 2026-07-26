@@ -58,11 +58,6 @@ impl Weather {
         }
     }
 
-    fn set_loading_state(&self, status: LoadingStatus) {
-        let mut state = self.state.lock().unwrap();
-        state.loading_status = status;
-    }
-
     fn set_error_state(&self, status: LoadingStatus) {
         let mut state = self.state.lock().unwrap();
         state.loading_status = status;
@@ -101,17 +96,14 @@ impl Weather {
     }
 
     async fn fetch_weather_data(&self) {
-        self.set_loading_state(LoadingStatus::Loading);
-
-        let location_data = {
+        let (city, lat, lon, timezone) = {
             let greeting_state = self.greeting_state.lock().unwrap();
 
             if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
-                self.set_loading_state(LoadingStatus::NotStarted);
+                self.state.lock().unwrap().loading_status = LoadingStatus::NotStarted;
                 return;
             }
 
-            // Make a copy of the location data to release the lock
             (
                 greeting_state.location.city.clone(),
                 greeting_state.location.latitude,
@@ -120,7 +112,6 @@ impl Weather {
             )
         };
 
-        let (city, lat, lon, timezone) = location_data;
         let api_url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={lat:?}&longitude={lon:?}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7&timezone={timezone}",
         );
@@ -250,23 +241,19 @@ impl Component for Weather {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
-                let weather_state = self.state.lock().unwrap();
+                let mut weather_state = self.state.lock().unwrap();
                 let greeting_state = self.greeting_state.lock().unwrap();
 
                 if !matches!(greeting_state.loading_status, LoadingStatus::Loaded) {
                     false
                 } else {
-                    let is_stale = |mins: i64| {
-                        weather_state.last_updated_at.is_none_or(|last| {
-                            Local::now().signed_duration_since(last).num_minutes() >= mins
-                        })
-                    };
-                    match weather_state.loading_status {
-                        LoadingStatus::NotStarted => true,
-                        LoadingStatus::Loading => false,
-                        LoadingStatus::Loaded => is_stale(REFETCH_WEATHER_IN_MINS),
-                        LoadingStatus::Error(_) => is_stale(RETRY_WEATHER_ON_ERROR_IN_MINS),
-                    }
+                    let last_updated_at = weather_state.last_updated_at;
+                    weather_state.loading_status.begin_fetch_if_due(
+                        Local::now(),
+                        last_updated_at,
+                        Some(REFETCH_WEATHER_IN_MINS),
+                        RETRY_WEATHER_ON_ERROR_IN_MINS,
+                    )
                 }
             };
 

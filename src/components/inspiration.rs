@@ -149,21 +149,13 @@ impl Component for Inspiration {
         if action == Action::Tick {
             let should_fetch = {
                 let mut state = self.state.lock().unwrap();
-                let is_stale = |mins: i64| {
-                    state.last_updated_at.is_none_or(|last| {
-                        Local::now().signed_duration_since(last).num_minutes() >= mins
-                    })
-                };
-                let should_fetch = match state.loading_status {
-                    LoadingStatus::NotStarted => true,
-                    LoadingStatus::Loading => false,
-                    LoadingStatus::Loaded => false,
-                    LoadingStatus::Error(_) => is_stale(RETRY_INSPIRATION_ON_ERROR_IN_MINS),
-                };
-                if should_fetch {
-                    state.loading_status = LoadingStatus::Loading;
-                }
-                should_fetch
+                let last_updated_at = state.last_updated_at;
+                state.loading_status.begin_fetch_if_due(
+                    Local::now(),
+                    last_updated_at,
+                    None, // no periodic refresh
+                    RETRY_INSPIRATION_ON_ERROR_IN_MINS,
+                )
             };
 
             if should_fetch {
