@@ -39,6 +39,9 @@ it can't actually render (common inside `tmux`); set
 `DAILY_DASHBOARD_IMAGE_PROTOCOL=halfblocks` (works everywhere) or force
 `kitty` / `sixel` / `iterm2` / `auto`.
 
+To show a FPS counter in the top-right corner, set
+`DAILY_DASHBOARD_SHOW_FPS=1` (also accepts `true` / `yes` / `on`).
+
 ## Quick start
 
 ```bash

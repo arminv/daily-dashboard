@@ -7,6 +7,10 @@ use crate::{
             MONTHLY_WIDTH,
         },
         dictionary::Dictionary,
+        fps::{
+            self,
+            FpsCounter,
+        },
         greeting::Greeting,
         inspiration::Inspiration,
         news::News,
@@ -43,6 +47,7 @@ pub struct Dashboard {
     picture_frame: PictureFrame,
     wikipedia: Wikipedia,
     news: News,
+    fps: Option<FpsCounter>,
 }
 
 impl Dashboard {
@@ -67,11 +72,12 @@ impl Dashboard {
             picture_frame,
             wikipedia: Wikipedia::new(client.clone()),
             news: News::new(client),
+            fps: fps::enabled_from_env().then(FpsCounter::new),
         }
     }
 
-    fn components(&mut self) -> [&mut dyn Component; 8] {
-        [
+    fn components(&mut self) -> Vec<&mut dyn Component> {
+        let mut components: Vec<&mut dyn Component> = vec![
             &mut self.calendar,
             &mut self.greeting,
             &mut self.weather,
@@ -80,7 +86,11 @@ impl Dashboard {
             &mut self.wikipedia,
             &mut self.dictionary,
             &mut self.news,
-        ]
+        ];
+        if let Some(fps) = self.fps.as_mut() {
+            components.push(fps);
+        }
+        components
     }
 }
 
@@ -192,6 +202,11 @@ impl Component for Dashboard {
             .split(page_layout[1]);
         self.wikipedia.draw(frame, bottom_row_layout[0])?;
         self.news.draw(frame, bottom_row_layout[1])?;
+
+        if let Some(fps) = self.fps.as_mut() {
+            fps.draw(frame, area)?;
+        }
+
         Ok(())
     }
 }
