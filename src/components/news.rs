@@ -215,15 +215,26 @@ impl Component for News {
         let mut news_state = self.state.lock().unwrap();
         match &news_state.loading_status {
             LoadingStatus::NotStarted => {
-                frame.render_widget(theme::panel_block("📰 News"), area);
+                theme::render_status_panel(frame, area, "📰 News", theme::ACCENT, "", theme::HINT);
             }
             LoadingStatus::Loading => {
-                frame.render_widget(theme::panel_block("📰 News — Loading..."), area);
+                theme::render_status_panel(
+                    frame,
+                    area,
+                    "📰 News — Loading...",
+                    theme::LOADING,
+                    "Fetching headlines...",
+                    theme::HINT,
+                );
             }
             LoadingStatus::Error(error) => {
-                frame.render_widget(
-                    theme::panel_block_colored(format!("📰 News — Error: {error}"), theme::ERROR),
+                theme::render_status_panel(
+                    frame,
                     area,
+                    format!("📰 News — Error: {error}"),
+                    theme::ERROR,
+                    format!("Couldn't load news: {error}"),
+                    Color::LightRed,
                 );
             }
             LoadingStatus::Loaded => {

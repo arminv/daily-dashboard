@@ -56,7 +56,7 @@ cargo test -- --ignored
 | `src/components.rs`   | The `Component` trait and the widget submodule declarations.                                                                                                                                            |
 | `src/components/*.rs` | The widgets: `calendar`, `greeting`, `weather`, `picture_frame`, `wikipedia`, `inspiration`, `dictionary`, `news`, `fps` (opt-in via `DAILY_DASHBOARD_SHOW_FPS`).                                       |
 | `src/http.rs`         | Shared `reqwest::Client` + `get_json` / `get_text` / `get_bytes_redirected` helpers used by every fetch.                                                                                                |
-| `src/theme.rs`        | Centralized border/title/color styles (`panel_block`, `panel_block_colored`, `frame_block`, `ACCENT`/`LOADING`/`ERROR`/`HINT`).                                                                         |
+| `src/theme.rs`        | Centralized border/title/color styles (`panel_block`, `panel_block_colored`, `frame_block`, `render_status_panel`, `status_paragraph`, `ACCENT`/`LOADING`/`ERROR`/`HINT`).                              |
 | `src/config.rs`       | Layered config loading + keybinding/style parsing.                                                                                                                                                      |
 | `src/cli.rs`          | `clap` CLI definition (`--tick-rate`, `--frame-rate`).                                                                                                                                                  |
 | `src/errors.rs`       | `color_eyre` hook + panic handler.                                                                                                                                                                      |
@@ -156,6 +156,8 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - `src/theme.rs` centralizes the visual language so widgets don't hardcode styles:
   - `panel_block(title)` / `panel_block_colored(title, color)` — bordered block drawn **before** content (content renders into `block.inner(area)`); uses `.style()` so the accent reaches empty cells.
   - `frame_block(title)` — bordered block drawn **after** content (the shared Calendar panel); uses only `.border_style()` / `.title_style()` (no `.style()`) so it doesn't recolor already-drawn cells.
+  - `render_status_panel(...)` — NotStarted / Loading / Error empty states with a colored border + optional body message (Inspiration, News, Daily Picture, Dictionary idle/loading).
+  - `status_paragraph(...)` — accent-bordered panel whose **body** carries the status color (Wikipedia results / extract panes).
   - Color constants: `ACCENT` (Cyan, borders/titles), `LOADING` (Yellow), `ERROR` (Red), `HINT` (DarkGray).
 
 ### Refresh Intervals

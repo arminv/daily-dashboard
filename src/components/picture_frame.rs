@@ -200,17 +200,21 @@ impl Component for PictureFrame {
             return Ok(());
         }
 
-        let block = match &status {
-            LoadingStatus::Error(error) => theme::panel_block_colored(
-                format!("🖼  Daily Picture - Error: {error}"),
-                theme::ERROR,
-            ),
-            LoadingStatus::Loading => theme::panel_block("🖼  Daily Picture - Loading..."),
-            _ => theme::panel_block("🖼  Daily Picture"),
+        let (title, border_color) = match &status {
+            LoadingStatus::Error(error) => {
+                (format!("🖼  Daily Picture — Error: {error}"), theme::ERROR)
+            }
+            LoadingStatus::Loading => ("🖼  Daily Picture — Loading...".to_string(), theme::LOADING),
+            _ => ("🖼  Daily Picture".to_string(), theme::ACCENT),
         };
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-        frame.render_widget(hint_paragraph(), inner);
+        theme::render_status_panel(
+            frame,
+            area,
+            title,
+            border_color,
+            "Shift+N - fetch a new image",
+            theme::HINT,
+        );
         Ok(())
     }
 }

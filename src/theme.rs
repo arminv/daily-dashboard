@@ -1,4 +1,6 @@
 use ratatui::{
+    Frame,
+    layout::Rect,
     style::{
         Color,
         Style,
@@ -7,6 +9,8 @@ use ratatui::{
     widgets::{
         Block,
         Borders,
+        Paragraph,
+        Wrap,
     },
 };
 
@@ -48,4 +52,47 @@ pub fn frame_block<'a>(title: impl Into<Line<'a>>) -> Block<'a> {
         .title(title)
         .title_style(Style::default().fg(ACCENT))
         .border_style(Style::default().fg(ACCENT))
+}
+
+/// Render a bordered status panel with an optional body message.
+///
+/// Used for NotStarted / Loading / Error empty states where the border color
+/// and title carry the status (Inspiration, News, Daily Picture) or stay on
+/// [`ACCENT`] while the body text carries it (Dictionary). An empty `message`
+/// draws only the bordered frame.
+pub fn render_status_panel(
+    frame: &mut Frame,
+    area: Rect,
+    title: impl Into<Line<'static>>,
+    border_color: Color,
+    message: impl AsRef<str>,
+    message_color: Color,
+) {
+    let block = panel_block_colored(title, border_color);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let message = message.as_ref();
+    if message.is_empty() {
+        return;
+    }
+    frame.render_widget(
+        Paragraph::new(message.to_string())
+            .style(Style::default().fg(message_color))
+            .wrap(Wrap { trim: true }),
+        inner,
+    );
+}
+
+/// Build a status paragraph whose **body** carries the status color, while the
+/// border stays on [`ACCENT`] (Wikipedia results / extract panes).
+pub fn status_paragraph(
+    title: impl Into<String>,
+    message: impl Into<String>,
+    message_color: Color,
+) -> Paragraph<'static> {
+    Paragraph::new(message.into())
+        .block(panel_block(title.into()))
+        .style(Style::default().fg(message_color))
+        .wrap(Wrap { trim: true })
 }

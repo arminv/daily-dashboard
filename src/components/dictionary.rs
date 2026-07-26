@@ -155,25 +155,29 @@ impl Dictionary {
     fn render_definitions(&self, frame: &mut Frame, area: Rect) {
         let data = self.data.lock().unwrap();
 
-        let block = theme::panel_block("📖 Definition");
-
         match &data.loading_status {
             LoadingStatus::NotStarted => {
-                let paragraph =
-                    Paragraph::new("Press Esc to type a word above, then Enter to look it up.")
-                        .block(block)
-                        .style(Style::default().fg(theme::HINT))
-                        .wrap(Wrap { trim: true });
-                frame.render_widget(paragraph, area);
+                theme::render_status_panel(
+                    frame,
+                    area,
+                    "📖 Definition",
+                    theme::ACCENT,
+                    "Press Esc to type a word above, then Enter to look it up.",
+                    theme::HINT,
+                );
             }
             LoadingStatus::Loading => {
-                let paragraph = Paragraph::new(format!("Looking up \"{}\"...", data.search_word))
-                    .block(block)
-                    .style(Style::default().fg(theme::LOADING))
-                    .wrap(Wrap { trim: true });
-                frame.render_widget(paragraph, area);
+                theme::render_status_panel(
+                    frame,
+                    area,
+                    "📖 Definition",
+                    theme::ACCENT,
+                    format!("Looking up \"{}\"...", data.search_word),
+                    theme::LOADING,
+                );
             }
             LoadingStatus::Error(error) => {
+                let block = theme::panel_block("📖 Definition");
                 let lines = vec![
                     Line::from(Span::styled(
                         format!("No results for \"{}\"", data.search_word),
@@ -194,6 +198,7 @@ impl Dictionary {
                 frame.render_widget(paragraph, area);
             }
             LoadingStatus::Loaded => {
+                let block = theme::panel_block("📖 Definition");
                 let text = build_definition_text(&data.entries);
                 let paragraph = Paragraph::new(text)
                     .block(block)
