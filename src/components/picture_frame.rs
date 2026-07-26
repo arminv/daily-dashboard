@@ -64,8 +64,10 @@ pub struct ImageState {
     pub is_refetch_requested: bool,
 }
 
+type SharedImageState = Arc<Mutex<ImageState>>;
+
 pub struct PictureFrame {
-    state: Arc<Mutex<ImageState>>,
+    state: SharedImageState,
     client: Client,
     picker: Picker,
     resize_rx: UnboundedReceiver<ResizeRequest>,
@@ -290,7 +292,7 @@ fn auto_picker() -> Picker {
     picker
 }
 
-fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
+fn record_error(state: &SharedImageState, err: color_eyre::Report) {
     let status = LoadingStatus::from_report("Daily Picture", &err);
     let mut state = state.lock().unwrap();
     state.is_in_flight = false;
@@ -300,7 +302,7 @@ fn record_error(state: &Arc<Mutex<ImageState>>, err: color_eyre::Report) {
     }
 }
 
-async fn fetch_image(client: Client, state: Arc<Mutex<ImageState>>) {
+async fn fetch_image(client: Client, state: SharedImageState) {
     let url = image_url();
 
     let bytes = match http::get_bytes_redirected(&client, &url).await {

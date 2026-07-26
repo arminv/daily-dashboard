@@ -78,6 +78,8 @@ pub struct WikipediaData {
     fetch_generation: u64,
 }
 
+type SharedWikipediaData = Arc<Mutex<WikipediaData>>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EnterAction {
     Search,
@@ -103,7 +105,7 @@ fn status_paragraph(
         .wrap(Wrap { trim: true })
 }
 
-fn is_current(data: &Arc<Mutex<WikipediaData>>, generation: u64) -> bool {
+fn is_current(data: &SharedWikipediaData, generation: u64) -> bool {
     data.lock().unwrap().fetch_generation == generation
 }
 
@@ -150,7 +152,7 @@ fn wiki_page_url(title: &str) -> String {
 }
 
 pub struct Wikipedia {
-    data: Arc<Mutex<WikipediaData>>,
+    data: SharedWikipediaData,
     input: TextArea<'static>,
     input_mode: InputMode,
     client: reqwest::Client,
@@ -399,7 +401,7 @@ impl Wikipedia {
 }
 
 async fn fetch_search_results(
-    data: Arc<Mutex<WikipediaData>>,
+    data: SharedWikipediaData,
     query: String,
     generation: u64,
     client: reqwest::Client,
@@ -453,7 +455,7 @@ async fn fetch_search_results(
 }
 
 async fn fetch_extracts_batch(
-    data: Arc<Mutex<WikipediaData>>,
+    data: SharedWikipediaData,
     page_ids: Vec<u64>,
     generation: u64,
     client: reqwest::Client,

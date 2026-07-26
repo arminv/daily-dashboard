@@ -75,8 +75,10 @@ pub struct DictionaryData {
     last_updated_at: Option<chrono::DateTime<Local>>,
 }
 
+type SharedDictionaryData = Arc<Mutex<DictionaryData>>;
+
 pub struct Dictionary {
-    data: Arc<Mutex<DictionaryData>>,
+    data: SharedDictionaryData,
     // `TextArea` is not `Send`, so it lives outside the shared state.
     input: TextArea<'static>,
     input_mode: InputMode,
@@ -203,11 +205,7 @@ impl Dictionary {
     }
 }
 
-async fn fetch_word_definition(
-    data: Arc<Mutex<DictionaryData>>,
-    word: String,
-    client: reqwest::Client,
-) {
+async fn fetch_word_definition(data: SharedDictionaryData, word: String, client: reqwest::Client) {
     {
         let mut state = data.lock().unwrap();
         state.loading_status = LoadingStatus::Loading;
