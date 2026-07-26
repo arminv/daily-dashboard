@@ -76,6 +76,10 @@ impl Dashboard {
         }
     }
 
+    pub fn is_capturing_input(&self) -> bool {
+        self.wikipedia.is_capturing_input() || self.dictionary.is_capturing_input()
+    }
+
     fn components(&mut self) -> Vec<&mut dyn Component> {
         let mut components: Vec<&mut dyn Component> = vec![
             &mut self.calendar,

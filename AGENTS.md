@@ -134,7 +134,7 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - Actions are defined in `src/action.rs` (Tick, Render, Resize, Quit, Suspend, Resume, Error, …).
 - Components communicate via `tokio::sync::mpsc` unbounded channels; the main loop in `src/app.rs` dispatches actions to `Dashboard`, which fans them out to children.
 - Configurable keybindings in `config.json5` map keys to actions per `Mode` (only `Home` exists).
-- **Event propagation:** `Dashboard::handle_events` first delivers events to components with `is_capturing_input()` (Dictionary / Wikipedia while editing), then to the rest. That way typing `/` in the Dictionary isn't stolen by Wikipedia's `/`-to-edit, while Wikipedia can still sit before Dictionary in `components()` so Esc-to-exit Wikipedia wins over Esc-to-edit Dictionary when neither (or Wikipedia) is capturing. Propagation **stops** as soon as one returns `Some(action)`.
+- **Event propagation:** `Dashboard::handle_events` first delivers events to components with `is_capturing_input()` (Dictionary / Wikipedia while editing), then to the rest. That way typing `/` in the Dictionary isn't stolen by Wikipedia's `/`-to-edit, while Wikipedia can still sit before Dictionary in `components()` so Esc-to-exit Wikipedia wins over Esc-to-edit Dictionary when neither (or Wikipedia) is capturing. Propagation **stops** as soon as one returns `Some(action)`. While any child is capturing, `App` also skips the config keymap for plain (unmodified) keys so typing `q` inserts the letter instead of firing Quit; Control/Alt chords (`Ctrl-c`, `Ctrl-d`, `Ctrl-z`) still apply.
 - **Two key paths:** global keys (`q`, `Ctrl-c`, `Ctrl-d`, `Ctrl-z`) go through the config keymap → `Action`. Widget-specific keys (News navigation, Dictionary/Wikipedia input) are handled directly in each widget's `handle_events` and bypass the keymap.
 
 ### State Management
@@ -205,6 +205,8 @@ Default keybindings (config-driven, global):
 
 - `q`, `Ctrl-d`, `Ctrl-c` — Quit
 - `Ctrl-z` — Suspend (returns to shell)
+
+While Dictionary or Wikipedia is editing, plain `q` types into the field; use `Ctrl-c` / `Ctrl-d` to quit.
 
 Widget keys (handled directly in each widget, **not** via the config keymap):
 

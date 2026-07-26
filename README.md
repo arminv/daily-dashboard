@@ -52,10 +52,10 @@ cargo run
 
 **Global** (configurable in `config.json5`; see `.config/config.json5`):
 
-| Key                       | Action                    |
-| ------------------------- | ------------------------- |
-| `q` / `Ctrl-c` / `Ctrl-d` | Quit                      |
-| `Ctrl-z`                  | Suspend (return to shell) |
+| Key                       | Action                                                             |
+| ------------------------- | ------------------------------------------------------------------ |
+| `q` / `Ctrl-c` / `Ctrl-d` | Quit (plain `q` is ignored while Dictionary/Wikipedia are editing) |
+| `Ctrl-z`                  | Suspend (return to shell)                                          |
 
 **Dictionary**
 
