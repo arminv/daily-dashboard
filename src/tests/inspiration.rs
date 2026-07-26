@@ -65,9 +65,9 @@ fn inspiration_error_renders_message() {
 #[test]
 fn parse_quote_extracts_text_and_author() {
     let json = serde_json::json!([{ "q": "Stay hungry.", "a": "Steve" }]);
-    let (text, author) = parse_quote(&json).expect("valid quote should parse");
-    assert_eq!(text, "Stay hungry.");
-    assert_eq!(author, "Steve");
+    let quote = parse_quote(&json).expect("valid quote should parse");
+    assert_eq!(quote.text, "Stay hungry.");
+    assert_eq!(quote.author, "Steve");
 }
 
 #[test]

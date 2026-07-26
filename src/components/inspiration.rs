@@ -69,7 +69,7 @@ impl Inspiration {
     }
 
     async fn fetch_daily_content(&self) {
-        let (quote_text, quote_author) = match self.fetch_quote().await {
+        let quote = match self.fetch_quote().await {
             Ok(quote) => quote,
             Err(e) => {
                 self.set_error_state(LoadingStatus::from_report("Inspiration", &e));
@@ -78,13 +78,13 @@ impl Inspiration {
         };
 
         let mut state = self.state.lock().unwrap();
-        state.quote_text = quote_text;
-        state.quote_author = quote_author;
+        state.quote_text = quote.text;
+        state.quote_author = quote.author;
         state.loading_status = LoadingStatus::Loaded;
         state.last_updated_at = Some(Local::now());
     }
 
-    async fn fetch_quote(&self) -> Result<(String, String)> {
+    async fn fetch_quote(&self) -> Result<Quote> {
         let json = http::get_json(&self.client, QUOTE_API_URL)
             .await
             .wrap_err("failed to fetch quote")?;
@@ -92,29 +92,35 @@ impl Inspiration {
     }
 }
 
-fn parse_quote(json: &Value) -> Result<(String, String)> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Quote {
+    text: String,
+    author: String,
+}
+
+fn parse_quote(json: &Value) -> Result<Quote> {
     let entry = json
         .as_array()
         .and_then(|arr| arr.first())
         .ok_or_else(|| eyre!("unexpected quote response format"))?;
 
-    let quote_text = entry
+    let text = entry
         .get("q")
         .and_then(|v| v.as_str())
         .ok_or_else(|| eyre!("missing quote text"))?
         .to_string();
 
-    let quote_author = entry
+    let author = entry
         .get("a")
         .and_then(|v| v.as_str())
         .ok_or_else(|| eyre!("missing quote author"))?
         .to_string();
 
-    if quote_text.is_empty() {
+    if text.is_empty() {
         bail!("empty quote text");
     }
 
-    Ok((quote_text, quote_author))
+    Ok(Quote { text, author })
 }
 
 /// Render a bordered status panel (title + one-line message) for the

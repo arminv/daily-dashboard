@@ -166,10 +166,10 @@ impl Weather {
             weather_state.icon = self.get_weather_icon(code_value);
         }
 
-        let (weekdays, highs, lows) = parse_daily_forecast(&json);
-        weather_state.daily_weekdays = weekdays;
-        weather_state.daily_high_temperatures = highs;
-        weather_state.daily_low_temperatures = lows;
+        let forecast = parse_daily_forecast(&json);
+        weather_state.daily_weekdays = forecast.weekdays;
+        weather_state.daily_high_temperatures = forecast.highs;
+        weather_state.daily_low_temperatures = forecast.lows;
 
         weather_state.loading_status = LoadingStatus::Loaded;
         weather_state.last_updated_at = Some(Local::now());
@@ -205,37 +205,45 @@ impl Weather {
     }
 }
 
-fn parse_daily_forecast(json: &serde_json::Value) -> (Vec<String>, Vec<f32>, Vec<f32>) {
-    let mut weekdays = Vec::new();
-    let mut highs = Vec::new();
-    let mut lows = Vec::new();
-    if let Some(daily) = json.get("daily") {
-        if let Some(time_values) = daily.get("time").and_then(|a| a.as_array()) {
-            for time_value in time_values {
-                let date_str = time_value.as_str().unwrap_or("???");
-                weekdays.push(
-                    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                        .map(|date| date.weekday().to_string())
-                        .unwrap_or("???".to_string()),
-                );
-            }
-        }
-        if let Some(max_temps) = daily.get("temperature_2m_max").and_then(|a| a.as_array()) {
-            highs.extend(
-                max_temps
-                    .iter()
-                    .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
-            );
-        }
-        if let Some(min_temps) = daily.get("temperature_2m_min").and_then(|a| a.as_array()) {
-            lows.extend(
-                min_temps
-                    .iter()
-                    .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+#[derive(Clone, Debug, Default, PartialEq)]
+struct DailyForecast {
+    weekdays: Vec<String>,
+    highs: Vec<f32>,
+    lows: Vec<f32>,
+}
+
+fn parse_daily_forecast(json: &serde_json::Value) -> DailyForecast {
+    let mut forecast = DailyForecast::default();
+    let Some(daily) = json.get("daily") else {
+        return forecast;
+    };
+
+    if let Some(time_values) = daily.get("time").and_then(|a| a.as_array()) {
+        for time_value in time_values {
+            let date_str = time_value.as_str().unwrap_or("???");
+            forecast.weekdays.push(
+                NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                    .map(|date| date.weekday().to_string())
+                    .unwrap_or("???".to_string()),
             );
         }
     }
-    (weekdays, highs, lows)
+    if let Some(max_temps) = daily.get("temperature_2m_max").and_then(|a| a.as_array()) {
+        forecast.highs.extend(
+            max_temps
+                .iter()
+                .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+        );
+    }
+    if let Some(min_temps) = daily.get("temperature_2m_min").and_then(|a| a.as_array()) {
+        forecast.lows.extend(
+            min_temps
+                .iter()
+                .filter_map(|v| v.as_f64().map(|temp| temp as f32)),
+        );
+    }
+
+    forecast
 }
 
 impl Component for Weather {
