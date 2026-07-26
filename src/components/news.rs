@@ -192,21 +192,13 @@ impl Component for News {
         if action == Action::Tick {
             let should_fetch = {
                 let mut news_state = self.state.lock().unwrap();
-                let is_stale = |mins: i64| {
-                    news_state.last_updated_at.is_none_or(|last| {
-                        Local::now().signed_duration_since(last).num_minutes() >= mins
-                    })
-                };
-                let should_fetch = match news_state.loading_status {
-                    LoadingStatus::NotStarted => true,
-                    LoadingStatus::Loading => false,
-                    LoadingStatus::Loaded => is_stale(FETCH_INTERVAL_MINS),
-                    LoadingStatus::Error(_) => is_stale(RETRY_NEWS_ON_ERROR_IN_MINS),
-                };
-                if should_fetch {
-                    news_state.loading_status = LoadingStatus::Loading;
-                }
-                should_fetch
+                let last_updated_at = news_state.last_updated_at;
+                news_state.loading_status.begin_fetch_if_due(
+                    Local::now(),
+                    last_updated_at,
+                    Some(FETCH_INTERVAL_MINS),
+                    RETRY_NEWS_ON_ERROR_IN_MINS,
+                )
             };
 
             if should_fetch {
@@ -223,15 +215,26 @@ impl Component for News {
         let mut news_state = self.state.lock().unwrap();
         match &news_state.loading_status {
             LoadingStatus::NotStarted => {
-                frame.render_widget(theme::panel_block("📰 News"), area);
+                theme::render_status_panel(frame, area, "📰 News", theme::ACCENT, "", theme::HINT);
             }
             LoadingStatus::Loading => {
-                frame.render_widget(theme::panel_block("📰 News — Loading..."), area);
+                theme::render_status_panel(
+                    frame,
+                    area,
+                    "📰 News — Loading...",
+                    theme::LOADING,
+                    "Fetching headlines...",
+                    theme::HINT,
+                );
             }
             LoadingStatus::Error(error) => {
-                frame.render_widget(
-                    theme::panel_block_colored(format!("📰 News — Error: {error}"), theme::ERROR),
+                theme::render_status_panel(
+                    frame,
                     area,
+                    format!("📰 News — Error: {error}"),
+                    theme::ERROR,
+                    format!("Couldn't load news: {error}"),
+                    Color::LightRed,
                 );
             }
             LoadingStatus::Loaded => {

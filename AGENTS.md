@@ -46,22 +46,22 @@ cargo test -- --ignored
 
 ## Source Map
 
-| File                  | Responsibility                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/main.rs`         | Entry point: error/logging init, CLI parse, run `App`. Declares all top-level modules.                                               |
-| `src/app.rs`          | `App`: owns the event loop, config, the single `Dashboard`, and the action channel. Defines `Mode` and `LoadingStatus`.              |
-| `src/tui.rs`          | Wraps ratatui/crossterm; runs a background event loop (tick, render, key, mouse, resize) over an mpsc channel.                       |
-| `src/action.rs`       | The `Action` enum (Tick, Render, Resize, Quit, Suspend, Resume, Error, …).                                                           |
-| `src/dashboard.rs`    | The only top-level `Component` registered in `App`. Owns and lays out all widgets.                                                   |
-| `src/components.rs`   | The `Component` trait and the widget submodule declarations.                                                                         |
-| `src/components/*.rs` | The widgets: `calendar`, `greeting`, `weather`, `picture_frame`, `wikipedia`, `inspiration`, `dictionary`, `news`, `fps` (disabled). |
-| `src/http.rs`         | Shared `reqwest::Client` + `get_json` / `get_text` / `get_bytes_redirected` helpers used by every fetch.                             |
-| `src/theme.rs`        | Centralized border/title/color styles (`panel_block`, `panel_block_colored`, `frame_block`, `ACCENT`/`LOADING`/`ERROR`/`HINT`).      |
-| `src/config.rs`       | Layered config loading + keybinding/style parsing.                                                                                   |
-| `src/cli.rs`          | `clap` CLI definition (`--tick-rate`, `--frame-rate`).                                                                               |
-| `src/errors.rs`       | `color_eyre` hook + panic handler.                                                                                                   |
-| `src/logging.rs`      | `tracing` subscriber setup.                                                                                                          |
-| `src/tests/*.rs`      | Unit/render tests, included per-widget via `#[cfg(test)] #[path = "../tests/<name>.rs"] mod tests;`.                                 |
+| File                  | Responsibility                                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main.rs`         | Entry point: error/logging init, CLI parse, run `App`. Declares all top-level modules.                                                                                                                  |
+| `src/app.rs`          | `App`: owns the event loop, config, the single `Dashboard`, and the action channel. Defines `Mode` and `LoadingStatus` (including shared fetch-schedule helpers `is_fetch_due` / `begin_fetch_if_due`). |
+| `src/tui.rs`          | Wraps ratatui/crossterm; runs a background event loop (tick, render, key, mouse, resize) over an mpsc channel.                                                                                          |
+| `src/action.rs`       | The `Action` enum (Tick, Render, Resize, Quit, Suspend, Resume, Error, …).                                                                                                                              |
+| `src/dashboard.rs`    | The only top-level `Component` registered in `App`. Owns and lays out all widgets.                                                                                                                      |
+| `src/components.rs`   | The `Component` trait and the widget submodule declarations.                                                                                                                                            |
+| `src/components/*.rs` | The widgets: `calendar`, `greeting`, `weather`, `picture_frame`, `wikipedia`, `inspiration`, `dictionary`, `news`, `fps` (opt-in via `DAILY_DASHBOARD_SHOW_FPS`).                                       |
+| `src/http.rs`         | Shared `reqwest::Client` + `get_json` / `get_text` / `get_bytes_redirected` helpers used by every fetch.                                                                                                |
+| `src/theme.rs`        | Centralized border/title/color styles (`panel_block`, `panel_block_colored`, `frame_block`, `render_status_panel`, `status_paragraph`, `ACCENT`/`LOADING`/`ERROR`/`HINT`).                              |
+| `src/config.rs`       | Layered config loading + keybinding/style parsing.                                                                                                                                                      |
+| `src/cli.rs`          | `clap` CLI definition (`--tick-rate`, `--frame-rate`).                                                                                                                                                  |
+| `src/errors.rs`       | `color_eyre` hook + panic handler.                                                                                                                                                                      |
+| `src/logging.rs`      | `tracing` subscriber setup.                                                                                                                                                                             |
+| `src/tests/*.rs`      | Unit/render tests, included per-widget via `#[cfg(test)] #[path = "../tests/<name>.rs"] mod tests;`.                                                                                                    |
 
 ## Architecture Overview
 
@@ -127,20 +127,20 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - **Wikipedia** (`src/components/wikipedia.rs`) — on-demand Wikipedia search via the MediaWiki Action API (`list=search`), then a **single** follow-up `prop=extracts|description` request that fills every result. Arrow-key selection is local (no per-row HTTP); results use ratatui `List` + `ListState` (same idea as News's `TableState`). `/` enters editing mode (Dictionary keeps `Esc` to start typing); Esc leaves editing; Enter submits the query (or opens the selected article when the input still matches the last search). While editing, `↑`/`↓` move the selection. Registered **before** Dictionary and News in `Dashboard::components()` so Esc-to-exit Wikipedia wins over Dictionary's Esc-to-edit. Normal mode only listens for `/`, so Dictionary's Enter-to-search is never stolen.
 - **News** (`src/components/news.rs`) — scrollable, categorized news table with keyboard navigation and browser links.
 - **Daily Picture** (`src/components/picture_frame.rs`) — a random photo from Lorem Picsum's `/{w}/{h}` endpoint (which serves a different image per request; no API key, no rate limit) rendered via `ratatui-image` (auto-detects kitty/iTerm2/sixel; falls back to unicode halfblocks). Uses `StatefulImage` + `ThreadProtocol` so resize/encode is offloaded off the render path. The panel title is the static "🖼 Daily Picture"; no per-image metadata is fetched or shown, and a one-line hint below the image advertises `Shift+N`. It fetches once on startup, then only on demand: pressing `Shift+N` sets `ImageState.refetch_requested`, and the next `maybe_spawn_fetch` grabs a fresh random photo (deferred if a fetch is already in flight). A failed fetch is not auto-retried — press `Shift+N` to try again (the last-good image keeps showing if one was already loaded). The handler matches on the uppercase `N` character (exactly what Shift+N produces), so lowercase `n` and any `Ctrl`/`Ctrl+Shift` combo (reported by terminals as lowercase `Ctrl+n`) are ignored. On resize, `App::handle_resize` calls `tui.resize()` (ratatui's `Terminal::resize`), which clears the viewport (`ESC[2J`) and resets ratatui's back buffer so the next render repaints everything. (It must **not** call `Terminal::clear`, which does a blocking `ESC[6n` cursor-position round-trip that our background `EventStream` starves, timing out with "The cursor position could not be read within a normal duration".) Note that `ESC[2J` doesn't reliably evict images already _placed_ by a graphics protocol (iTerm2/kitty/sixel), so a resize can still leave an on-screen ghost; pressing `Shift+N` re-fetches and re-installs the protocol (`replace_protocol`), which re-places the image cleanly. A `Clear` widget in the draw would _not_ help — ratatui resets the frame buffer every pass (`swap_buffers`), and the ghost lives on the terminal surface, not in the buffer. Override the protocol with `DAILY_DASHBOARD_IMAGE_PROTOCOL=auto|halfblocks|kitty|sixel|iterm2`; Warp is forced to `iTerm2` (it renders the iTerm2 OSC 1337 inline-image protocol but not Kitty Unicode placeholders, which would emit `[?]` tofu); the VS Code/Cursor integrated terminal (`TERM_PROGRAM=vscode`) is forced to `halfblocks` because its inline-image support (`terminal.integrated.enableImages`) is off by default yet it still answers graphics capability queries, so a graphics protocol would render nothing (override with `DAILY_DASHBOARD_IMAGE_PROTOCOL=iterm2` if you enabled that setting); use `halfblocks` for any other terminal that emits `[?]` tofu (e.g. inside `tmux`).
-- **FPS** (`src/components/fps.rs`) — performance counter (disabled / dead code).
+- **FPS** (`src/components/fps.rs`) — optional tick/FPS overlay (dim, top-right). Instantiated only when `DAILY_DASHBOARD_SHOW_FPS` is truthy (`1`/`true`/`yes`/`on`); drawn last over the full dashboard area so it doesn't affect panel layout.
 
 ### Event System
 
 - Actions are defined in `src/action.rs` (Tick, Render, Resize, Quit, Suspend, Resume, Error, …).
 - Components communicate via `tokio::sync::mpsc` unbounded channels; the main loop in `src/app.rs` dispatches actions to `Dashboard`, which fans them out to children.
 - Configurable keybindings in `config.json5` map keys to actions per `Mode` (only `Home` exists).
-- **Event propagation:** `Dashboard::handle_events` first delivers events to components with `is_capturing_input()` (Dictionary / Wikipedia while editing), then to the rest. That way typing `/` in the Dictionary isn't stolen by Wikipedia's `/`-to-edit, while Wikipedia can still sit before Dictionary in `components()` so Esc-to-exit Wikipedia wins over Esc-to-edit Dictionary when neither (or Wikipedia) is capturing. Propagation **stops** as soon as one returns `Some(action)`.
+- **Event propagation:** `Dashboard::handle_events` first delivers events to components with `is_capturing_input()` (Dictionary / Wikipedia while editing), then to the rest. That way typing `/` in the Dictionary isn't stolen by Wikipedia's `/`-to-edit, while Wikipedia can still sit before Dictionary in `components()` so Esc-to-exit Wikipedia wins over Esc-to-edit Dictionary when neither (or Wikipedia) is capturing. Propagation **stops** as soon as one returns `Some(action)`. While any child is capturing, `App` also skips the config keymap for plain (unmodified) keys so typing `q` inserts the letter instead of firing Quit; Control/Alt chords (`Ctrl-c`, `Ctrl-d`, `Ctrl-z`) still apply.
 - **Two key paths:** global keys (`q`, `Ctrl-c`, `Ctrl-d`, `Ctrl-z`) go through the config keymap → `Action`. Widget-specific keys (News navigation, Dictionary/Wikipedia input) are handled directly in each widget's `handle_events` and bypass the keymap.
 
 ### State Management
 
 - Widget state uses `Arc<Mutex<T>>` (`std::sync`) for thread-safe shared state. There are no true concurrent readers (the render thread and the fetch task never hold a lock at the same time meaningfully), so `Mutex` is used over `RwLock` for a simpler, single-`lock()` mental model. Note `Mutex` is **not reentrant**: never call a helper that locks the same state while already holding its guard (this is why `news::draw` reads the selected index from the guard it holds instead of calling a re-locking helper).
-- `LoadingStatus` enum (`src/app.rs`) tracks async states: `NotStarted`, `Loading`, `Loaded`, `Error(String)`. Fetch/parse failures go through `LoadingStatus::from_report(prefix, &err)` (for `color_eyre::Report`) or `LoadingStatus::from_msg(prefix, msg)` (for plain strings): both log once under `prefix` and build the UI `Error` string with Display formatting (`{e}` / `{e:#}` in logs for eyre chains — never `{e:?}`).
+- `LoadingStatus` enum (`src/app.rs`) tracks async states: `NotStarted`, `Loading`, `Loaded`, `Error(String)`. Fetch/parse failures go through `LoadingStatus::from_report(prefix, &err)` (for `color_eyre::Report`) or `LoadingStatus::from_msg(prefix, msg)` (for plain strings): both log once under `prefix` and build the UI `Error` string with Display formatting (`{e}` / `{e:#}` in logs for eyre chains — never `{e:?}`). Periodic widgets (News, Weather, Inspiration) decide whether to spawn via `LoadingStatus::begin_fetch_if_due(now, last_updated_at, refetch_after_mins, retry_after_mins)`, which flips to `Loading` under the same lock before `tokio::spawn` so overlapping ticks cannot start a second request (`refetch_after_mins: None` means never refresh while `Loaded`).
 - Async data fetching uses `tokio::spawn` inside `update()` on `Action::Tick` (or on submit for the Dictionary / Wikipedia). The `TextArea` is not `Send`, so the Dictionary and Wikipedia keep it outside the `Arc<Mutex<…>>` they share with their spawn tasks.
 - **Weather depends on location data from the Greeting component's shared state** — `Dashboard` constructs `Greeting` first and passes `greeting.state.clone()` into `Weather::new(...)`, so there is exactly one location fetch on startup.
 - **Daily Picture** keeps the non-`Clone` `ratatui_image::ThreadProtocol` (the `StatefulImage` state) as a direct field, outside the `Arc<Mutex<ImageState>>` it shares with its fetch task. The fetch task only clones `client` + `state` and decodes bytes to an `image::DynamicImage` (stored as `state.pending_image`); the main thread then creates the protocol from the `Picker` in `update()` (`install_pending_image`). The `Picker` is built once in `Dashboard::new()` (i.e. inside `App::new()`, **before** `tui.enter()` starts the event loop) via `Picker::from_query_stdio()` so its stdin query doesn't race crossterm's `EventStream`, falling back to `Picker::halfblocks()` on terminals with no graphics protocol.
@@ -156,14 +156,16 @@ Greeting and Calendar no longer coordinate hardcoded offsets — the Dashboard o
 - `src/theme.rs` centralizes the visual language so widgets don't hardcode styles:
   - `panel_block(title)` / `panel_block_colored(title, color)` — bordered block drawn **before** content (content renders into `block.inner(area)`); uses `.style()` so the accent reaches empty cells.
   - `frame_block(title)` — bordered block drawn **after** content (the shared Calendar panel); uses only `.border_style()` / `.title_style()` (no `.style()`) so it doesn't recolor already-drawn cells.
+  - `render_status_panel(...)` — NotStarted / Loading / Error empty states with a colored border + optional body message (Inspiration, News, Daily Picture, Dictionary idle/loading).
+  - `status_paragraph(...)` — accent-bordered panel whose **body** carries the status color (Wikipedia results / extract panes).
   - Color constants: `ACCENT` (Cyan, borders/titles), `LOADING` (Yellow), `ERROR` (Red), `HINT` (DarkGray).
 
 ### Refresh Intervals
 
 - **Greeting / Location**: fetched once on startup.
-- **Weather**: every 10 minutes (after location is loaded). Failed fetches retry after 1 minute.
-- **News**: every 30 minutes. Failed fetches retry after 1 minute. Overlapping fetches are gated by setting `Loading` before spawn.
-- **Inspiration**: once on the first tick (daily quote). Failed fetches retry after 1 minute (not every tick).
+- **Weather**: every 10 minutes (after location is loaded). Failed fetches retry after 1 minute. Overlapping fetches are gated by `LoadingStatus::begin_fetch_if_due` (sets `Loading` under the lock before spawn).
+- **News**: every 30 minutes. Failed fetches retry after 1 minute. Same `begin_fetch_if_due` gate as Weather.
+- **Inspiration**: once on the first tick (daily quote; `refetch_after_mins: None` so Loaded never auto-refreshes). Failed fetches retry after 1 minute via the same helper.
 - **Daily Picture**: once on startup, then only on demand via `Shift+N` (a fresh random Lorem Picsum photo each time). `Shift+N` sets `ImageState.refetch_requested`, honored by the next `maybe_spawn_fetch` (deferred if a fetch is already in flight). A failed fetch is not auto-retried; press `Shift+N` to retry (the last-good image keeps showing if one was already loaded).
 - **Dictionary**: on demand, when the user submits a word.
 - **Wikipedia**: on demand, when the user submits a search (`/`, type, Enter). Exactly two HTTP calls per search (search + one batched extracts query); changing selection does not hit the network.
@@ -197,12 +199,14 @@ Supports:
 
 - Keybindings per mode (`Home`).
 - Style configuration with color parsing.
-- Environment variable overrides (`DAILY_DASHBOARD_CONFIG`, `DAILY_DASHBOARD_DATA`, `DAILY_DASHBOARD_IMAGE_PROTOCOL`).
+- Environment variable overrides (`DAILY_DASHBOARD_CONFIG`, `DAILY_DASHBOARD_DATA`, `DAILY_DASHBOARD_IMAGE_PROTOCOL`, `DAILY_DASHBOARD_SHOW_FPS`).
 
 Default keybindings (config-driven, global):
 
 - `q`, `Ctrl-d`, `Ctrl-c` — Quit
 - `Ctrl-z` — Suspend (returns to shell)
+
+While Dictionary or Wikipedia is editing, plain `q` types into the field; use `Ctrl-c` / `Ctrl-d` to quit.
 
 Widget keys (handled directly in each widget, **not** via the config keymap):
 
@@ -227,6 +231,7 @@ Widget keys (handled directly in each widget, **not** via the config keymap):
 
 - Tests live in `src/tests/*.rs` and are attached per-module with `#[cfg(test)] #[path = "../tests/<name>.rs"] mod tests;`, giving them access to private items via `use super::*;`.
 - **Pure parse functions** are extracted out of the fetch paths and unit-tested:
+  - `LoadingStatus::is_fetch_due` / `begin_fetch_if_due` — NotStarted/Loading/Loaded/Error schedule rules, optional refetch interval, retry interval, and the Loading gate.
   - `news::parse_articles` — category ordering, missing-field skipping, per-category cap, unknown/empty categories.
   - `weather::parse_daily_forecast` — weekday/temp extraction, missing `daily`, bad dates, partial arrays.
   - `dictionary::parse_entry` and `dictionary::build_definition_text` — word/phonetic/meaning extraction, phonetics-array fallback, empty-meaning skipping, rendered text.

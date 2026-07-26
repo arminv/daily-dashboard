@@ -94,17 +94,6 @@ fn enter_action(input: &str, last_query: &str, has_loaded_results: bool) -> Ente
     }
 }
 
-fn status_paragraph(
-    title: impl Into<String>,
-    text: impl Into<String>,
-    style: Style,
-) -> Paragraph<'static> {
-    Paragraph::new(text.into())
-        .block(theme::panel_block(title.into()))
-        .style(style)
-        .wrap(Wrap { trim: true })
-}
-
 fn is_current(data: &SharedWikipediaData, generation: u64) -> bool {
     data.lock().unwrap().fetch_generation == generation
 }
@@ -273,10 +262,10 @@ impl Wikipedia {
         match &data.loading_status {
             LoadingStatus::NotStarted => {
                 frame.render_widget(
-                    status_paragraph(
+                    theme::status_paragraph(
                         "Results",
                         "Press / to type a query, then Enter to search.",
-                        Style::default().fg(theme::HINT),
+                        theme::HINT,
                     ),
                     area,
                 );
@@ -284,16 +273,13 @@ impl Wikipedia {
             LoadingStatus::Loading => {
                 let text = format!("Searching \"{}\"...", data.query);
                 frame.render_widget(
-                    status_paragraph("Results", text, Style::default().fg(theme::LOADING)),
+                    theme::status_paragraph("Results", text, theme::LOADING),
                     area,
                 );
             }
             LoadingStatus::Error(error) => {
                 let text = format!("No results for \"{}\"\n\n{error}", data.query);
-                frame.render_widget(
-                    status_paragraph("Results", text, Style::default().fg(theme::ERROR)),
-                    area,
-                );
+                frame.render_widget(theme::status_paragraph("Results", text, theme::ERROR), area);
             }
             LoadingStatus::Loaded => {
                 let selected = data.list_state.selected().unwrap_or(0);
@@ -343,14 +329,11 @@ impl Wikipedia {
                     .filter(|s| !s.is_empty())
                     .map(|s| format!("Loading full extract...\n\n{s}"))
                     .unwrap_or_else(|| "Loading extracts...".to_string());
-                frame.render_widget(
-                    status_paragraph(title, body, Style::default().fg(theme::LOADING)),
-                    area,
-                );
+                frame.render_widget(theme::status_paragraph(title, body, theme::LOADING), area);
             }
             (LoadingStatus::Loaded, LoadingStatus::Error(error)) => {
                 frame.render_widget(
-                    status_paragraph(title, error.clone(), Style::default().fg(theme::ERROR)),
+                    theme::status_paragraph(title, error.clone(), theme::ERROR),
                     area,
                 );
             }
@@ -388,10 +371,10 @@ impl Wikipedia {
             }
             _ => {
                 frame.render_widget(
-                    status_paragraph(
+                    theme::status_paragraph(
                         title,
                         "Select a result to read its extract.",
-                        Style::default().fg(theme::HINT),
+                        theme::HINT,
                     ),
                     area,
                 );

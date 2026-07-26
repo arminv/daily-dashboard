@@ -123,47 +123,18 @@ fn parse_quote(json: &Value) -> Result<Quote> {
     Ok(Quote { text, author })
 }
 
-/// Render a bordered status panel (title + one-line message) for the
-/// NotStarted / Loading / Error states of the inspiration widget.
-fn render_status(
-    frame: &mut Frame,
-    area: Rect,
-    title: String,
-    color: Color,
-    message: String,
-    message_color: Color,
-) {
-    let block = theme::panel_block_colored(title, color);
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    frame.render_widget(
-        Paragraph::new(message)
-            .style(Style::default().fg(message_color))
-            .wrap(Wrap { trim: true }),
-        inner,
-    );
-}
-
 impl Component for Inspiration {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if action == Action::Tick {
             let should_fetch = {
                 let mut state = self.state.lock().unwrap();
-                let is_stale = |mins: i64| {
-                    state.last_updated_at.is_none_or(|last| {
-                        Local::now().signed_duration_since(last).num_minutes() >= mins
-                    })
-                };
-                let should_fetch = match state.loading_status {
-                    LoadingStatus::NotStarted => true,
-                    LoadingStatus::Loading => false,
-                    LoadingStatus::Loaded => false,
-                    LoadingStatus::Error(_) => is_stale(RETRY_INSPIRATION_ON_ERROR_IN_MINS),
-                };
-                if should_fetch {
-                    state.loading_status = LoadingStatus::Loading;
-                }
-                should_fetch
+                let last_updated_at = state.last_updated_at;
+                state.loading_status.begin_fetch_if_due(
+                    Local::now(),
+                    last_updated_at,
+                    None, // no periodic refresh
+                    RETRY_INSPIRATION_ON_ERROR_IN_MINS,
+                )
             };
 
             if should_fetch {
@@ -180,23 +151,23 @@ impl Component for Inspiration {
         let inspiration_state = self.state.lock().unwrap();
 
         match &inspiration_state.loading_status {
-            LoadingStatus::NotStarted => render_status(
+            LoadingStatus::NotStarted => theme::render_status_panel(
                 frame,
                 area,
-                "✨ Daily Quote".to_string(),
+                "✨ Daily Quote",
                 theme::ACCENT,
-                "Fetching today's quote...".to_string(),
+                "Fetching today's quote...",
                 theme::HINT,
             ),
-            LoadingStatus::Loading => render_status(
+            LoadingStatus::Loading => theme::render_status_panel(
                 frame,
                 area,
-                "✨ Daily Quote — Loading...".to_string(),
+                "✨ Daily Quote — Loading...",
                 theme::LOADING,
-                "Fetching today's quote...".to_string(),
+                "Fetching today's quote...",
                 theme::HINT,
             ),
-            LoadingStatus::Error(error) => render_status(
+            LoadingStatus::Error(error) => theme::render_status_panel(
                 frame,
                 area,
                 format!("✨ Daily Quote — Error: {error}"),

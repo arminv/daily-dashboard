@@ -9,8 +9,15 @@ use crate::{
         Tui,
     },
 };
+use chrono::{
+    DateTime,
+    Local,
+};
 use color_eyre::Result;
-use crossterm::event::KeyEvent;
+use crossterm::event::{
+    KeyEvent,
+    KeyModifiers,
+};
 use ratatui::prelude::Rect;
 use serde::{
     Deserialize,
@@ -60,6 +67,38 @@ impl LoadingStatus {
         let msg = msg.into();
         error!("{prefix}: {msg}");
         Self::Error(msg)
+    }
+
+    pub fn is_fetch_due(
+        &self,
+        now: DateTime<Local>,
+        last_updated_at: Option<DateTime<Local>>,
+        refetch_after_mins: Option<i64>,
+        retry_after_mins: i64,
+    ) -> bool {
+        let is_stale = |mins: i64| {
+            last_updated_at.is_none_or(|last| now.signed_duration_since(last).num_minutes() >= mins)
+        };
+        match self {
+            Self::NotStarted => true,
+            Self::Loading => false,
+            Self::Loaded => refetch_after_mins.is_some_and(is_stale),
+            Self::Error(_) => is_stale(retry_after_mins),
+        }
+    }
+
+    pub fn begin_fetch_if_due(
+        &mut self,
+        now: DateTime<Local>,
+        last_updated_at: Option<DateTime<Local>>,
+        refetch_after_mins: Option<i64>,
+        retry_after_mins: i64,
+    ) -> bool {
+        if !self.is_fetch_due(now, last_updated_at, refetch_after_mins, retry_after_mins) {
+            return false;
+        }
+        *self = Self::Loading;
+        true
     }
 }
 
@@ -125,7 +164,11 @@ impl App {
             Event::Tick => action_tx.send(Action::Tick)?,
             Event::Render => action_tx.send(Action::Render)?,
             Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
-            Event::Key(key) => self.handle_key_event(key)?,
+            Event::Key(key)
+                if should_dispatch_global_keymap(self.dashboard.is_capturing_input(), &key) =>
+            {
+                self.handle_key_event(key)?;
+            }
             _ => {}
         }
 
@@ -210,3 +253,23 @@ impl App {
         Ok(())
     }
 }
+
+/// Whether a key should run the config keymap.
+///
+/// While a widget is capturing text input, only Control/Alt chords apply —
+/// otherwise typing `q` would Quit via the global `<q>` binding.
+fn should_dispatch_global_keymap(capturing_input: bool, key: &KeyEvent) -> bool {
+    if !capturing_input {
+        return true;
+    }
+    key.modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+}
+
+#[cfg(test)]
+#[path = "tests/loading_status.rs"]
+mod loading_status_tests;
+
+#[cfg(test)]
+#[path = "tests/app.rs"]
+mod tests;
